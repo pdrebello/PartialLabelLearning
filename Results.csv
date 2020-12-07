@@ -1,0 +1,4 @@
+,,Lost,MSRCv2,,Soccer Player,,Yahoo News,
+,Train,Test,Train,Test,Train,Test,Train,Test
+Naive Loss,80%,61%,77%,60%,74%,62%,81%,70%
+Min Loss,40%,39%,55%,31%,64%,58%,56%,50%
