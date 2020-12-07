@@ -16,8 +16,6 @@ class Dataset(torch.utils.data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, data, labels):
         'Initialization'
-        print(data.shape)
-        print(labels.shape)
         self.labels = labels.astype(np.float32)
         self.data = data.astype(np.float32)
 

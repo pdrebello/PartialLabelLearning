@@ -15,10 +15,10 @@ import scipy.io
 from dataset import Dataset, loadTrain
 import sys
 
-n_epochs = 100
-batch_size_train = 16
+n_epochs = 1000
+batch_size_train = 8
 batch_size_test = 1000
-learning_rate = 0.0001
+learning_rate = 0.001
 momentum = 0.5
 log_interval = 10
 
@@ -26,10 +26,12 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
-train_dataset, test_dataset, real_train_dataset, input_dim, output_dim = loadTrain('lost.mat')
+train_dataset, test_dataset, real_train_dataset, input_dim, output_dim = loadTrain('MSRCv2.mat')
 train_loader = torch.utils.data.DataLoader(train_dataset,
   batch_size=batch_size_train, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset,
+  batch_size=batch_size_test, shuffle=True)
+real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
   batch_size=batch_size_test, shuffle=True)
 
 def naive_loss(output, target):
@@ -90,7 +92,6 @@ def train(epoch, loss_function):
     output = network(data)
     
     loss = loss_function(output, target)
-    #print(loss)
     
     loss.backward()
     optimizer.step()
@@ -103,6 +104,19 @@ def train(epoch, loss_function):
         (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
       torch.save(network.state_dict(), 'results/model.pth')
       torch.save(optimizer.state_dict(), 'results/optimizer.pth')
+  correct = 0
+  with torch.no_grad():
+    for data, target in real_train_loader:
+    
+      output = network(data)
+      
+      pred = output.data.max(1, keepdim=True)[1]
+      targ_pred = target.data.max(1, keepdim=True)[1]
+      correct += pred.eq(targ_pred.data.view_as(pred)).sum()
+      
+  print('\nTrain set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    0, correct, len(real_train_loader.dataset),
+    100. * correct / len(real_train_loader.dataset)))
 
 def test(loss_function):
   network.eval()
