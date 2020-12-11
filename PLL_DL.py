@@ -14,9 +14,10 @@ import torch_optimizer as optim
 import scipy.io
 from dataset import Dataset, loadTrain
 import sys
+from IPython.core.debugger import Pdb
 
-n_epochs = 1000
-batch_size_train = 8
+n_epochs = 400
+batch_size_train = 2000
 batch_size_test = 1000
 learning_rate = 0.001
 momentum = 0.5
@@ -26,13 +27,12 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
-train_dataset, test_dataset, real_train_dataset, input_dim, output_dim = loadTrain('MSRCv2.mat')
-train_loader = torch.utils.data.DataLoader(train_dataset,
-  batch_size=batch_size_train, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset,
-  batch_size=batch_size_test, shuffle=True)
-real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
-  batch_size=batch_size_test, shuffle=True)
+def rl_loss(output, target):
+    prob = output.detach()
+    target_probs = (prob*target.float()).sum(dim=1)
+    mask = target == 1
+    loss = (prob[mask]*torch.log(output[mask])/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
+    return -loss
 
 def naive_loss(output, target):
     batch_size = output.shape[0]
@@ -54,7 +54,7 @@ def min_loss(output, target):
     return loss
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim, output_dim):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(input_dim, 512)
         self.fc2 = nn.Linear(512, 256)
@@ -68,42 +68,31 @@ class Net(nn.Module):
         x = F.softmax(self.fc3(x))
         return x
     
-network = Net()
-yogi = optim.Yogi(
-    network.parameters(),
-    lr= 0.01,
-    betas=(0.9, 0.999),
-    eps=1e-3,
-    initial_accumulator=1e-6,
-    weight_decay=0,
-)
-optimizer = optim.Lookahead(yogi, k=5, alpha=0.5)
-
-train_losses = []
-train_counter = []
-test_losses = []
-test_counter = [i*len(train_loader.dataset) for i in range(n_epochs + 1)]
 
 
-def train(epoch, loss_function):
+
+def train(network, optimizier, epoch, loss_function, f):
   network.train()
   for batch_idx, (data, target) in enumerate(train_loader):
+    
     optimizer.zero_grad()
     output = network(data)
-    
+    if(torch.isnan(output.sum())):
+        Pdb().set_trace()
     loss = loss_function(output, target)
-    
+    if(torch.isnan(loss)):
+        Pdb().set_trace()
     loss.backward()
     optimizer.step()
     if batch_idx % log_interval == 0:
       print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
         epoch, batch_idx * len(data), len(train_loader.dataset),
         100. * batch_idx / len(train_loader), loss.item()))
-      train_losses.append(loss.item())
-      train_counter.append(
-        (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
-      torch.save(network.state_dict(), 'results/model.pth')
-      torch.save(optimizer.state_dict(), 'results/optimizer.pth')
+      f.write('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+        epoch, batch_idx * len(data), len(train_loader.dataset),
+        100. * batch_idx / len(train_loader), loss.item()))
+      f.write("\n")
+      
   correct = 0
   with torch.no_grad():
     for data, target in real_train_loader:
@@ -117,8 +106,12 @@ def train(epoch, loss_function):
   print('\nTrain set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
     0, correct, len(real_train_loader.dataset),
     100. * correct / len(real_train_loader.dataset)))
+  f.write('\nTrain set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    0, correct, len(real_train_loader.dataset),
+    100. * correct / len(real_train_loader.dataset)))
+  f.write("\n")
 
-def test(loss_function):
+def test(network, loss_function, f):
   network.eval()
   test_loss = 0
   correct = 0
@@ -134,15 +127,46 @@ def test(loss_function):
       
       correct += pred.eq(targ_pred.data.view_as(pred)).sum()
   test_loss /= len(test_loader.dataset)
-  test_losses.append(test_loss)
+  #test_losses.append(test_loss)
   print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
     test_loss, correct, len(test_loader.dataset),
     100. * correct / len(test_loader.dataset)))
+  f.write('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    test_loss, correct, len(test_loader.dataset),
+    100. * correct / len(test_loader.dataset)))
+  f.write("\n")
 
-#test()
-for epoch in range(1, n_epochs + 1):
-  train(epoch, min_loss)
-  test(min_loss)
+datasets = ['Lost.mat', 'MSRCv2.mat', 'Soccer Player.mat','Yahoo! News.mat']
+losses = [naive_loss, min_loss, rl_loss]
+
+for filename in datasets:
+    train_dataset, test_dataset, real_train_dataset, input_dim, output_dim = loadTrain(filename)
+    train_loader = torch.utils.data.DataLoader(train_dataset,
+      batch_size=batch_size_train, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset,
+      batch_size=batch_size_test, shuffle=True)
+    real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
+      batch_size=batch_size_test, shuffle=True)
+    
+    for loss in losses:
+        network = Net(input_dim, output_dim)
+        #test(rl_loss)
+        
+        yogi = optim.Yogi(
+            network.parameters(),
+            lr= 0.01,
+            betas=(0.9, 0.999),
+            eps=1e-3,
+            initial_accumulator=1e-6,
+            weight_decay=0,
+        )
+        optimizer = optim.Lookahead(yogi, k=5, alpha=0.5)
+        f = open("results/"+filename+"_"+str(loss.__name__)+".txt","w")
+        
+        for epoch in range(1, n_epochs + 1):
+          train(network, optimizer, epoch, loss, f)
+          test(network, loss, f)
+        f.close()
 
 
 
