@@ -18,6 +18,7 @@ import torch
 import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
+#import torch_optimizer as optim
 import scipy.io
 from dataset import Dataset, loadTrain
 import sys
@@ -25,7 +26,7 @@ from IPython.core.debugger import Pdb
 import random
 import csv
 
-n_epochs = 200
+n_epochs = 300
 batch_size_train = 2000
 batch_size_test = 1000
 learning_rate = 0.001
@@ -92,6 +93,7 @@ class Net(nn.Module):
       self.train()
       for batch_idx, (data, target) in enumerate(self.train_loader):
         data, target = data.to(device), target.to(device)
+        #print(torch.sum(target,dim=1))
         self.optimizer.zero_grad()
         output = network(data)
         loss = loss_function(output, target)
@@ -151,12 +153,13 @@ def one_hot_embedding(labels, num_classes):
     return y[labels]
 
 def make_partials(target, output_dim):
-    options = [1,2,3,4,5,6,7]
-    howmany = random.choice(options)
+    #options = [1,2,3,4]
+    #howmany = random.choice(options)
     for i in target:
-        index_options = list(range(output_dim))
-        indices = random.sample(index_options, howmany)
-        i[indices] = 1
+        rand = torch.FloatTensor(output_dim).uniform_() > 0.5
+        #index_options = list(range(output_dim))
+        #indices = random.sample(index_options, howmany)
+        i[rand] = 1
     return target
     
 
@@ -223,7 +226,29 @@ for filename in datasets:
     
     #loss = rl_loss
     for loss in losses:
-        for trial_no in [0,1,2,3,4]:
+        network = Net(input_dim, output_dim)
+        network.to(device)
+        vals = [[],[],[],[]]
+        
+        optimizer = torch.optim.Adam(network.parameters())
+        network.optimizer = optimizer
+        network.train_loader = real_train_loader
+        network.test_loader = test_loader
+        network.real_train_loader = real_train_loader
+        
+        #f = open("results/"+filename+"_"+str(loss.__name__)+"_linear.txt","w")
+        
+        for epoch in range(1, n_epochs + 1):
+          network.myTrain(epoch, loss, vals)
+          network.myTest(loss, vals)
+          #print(vals)
+        with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str("PureLabels")+".csv","w", newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
+            for i in range(len(vals[0])):
+                writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
+                
+        for trial_no in range(10):
             network = Net(input_dim, output_dim)
             network.to(device)
             vals = [[],[],[],[]]
@@ -240,7 +265,7 @@ for filename in datasets:
               network.myTrain(epoch, loss, vals)
               network.myTest(loss, vals)
               #print(vals)
-            with open("results/"+filename+"_"+str(loss.__name__)+"_"+str(trial_no)+".csv","w", newline='') as file:
+            with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str(trial_no)+".csv","w", newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
                 for i in range(len(vals[0])):
