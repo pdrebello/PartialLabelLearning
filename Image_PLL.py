@@ -105,6 +105,7 @@ class Net(nn.Module):
       correct = 0
       with torch.no_grad():
           for data, target in self.real_train_loader:
+              data, target = data.to(device), target.to(device)
               output = self.forward(data)
               pred = output.data.max(1, keepdim=True)[1]
               targ_pred = target.data.max(1, keepdim=True)[1]
