@@ -18,7 +18,6 @@ import torch
 import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_optimizer as optim
 import scipy.io
 from dataset import Dataset, loadTrain
 import sys
@@ -227,16 +226,9 @@ for filename in datasets:
             network = Net(input_dim, output_dim)
             network.to(device)
             vals = [[],[],[],[]]
-            yogi = optim.Yogi(
-                network.parameters(),
-                lr= 0.01,
-                betas=(0.9, 0.999),
-                eps=1e-3,
-                initial_accumulator=1e-6,
-                weight_decay=0,
-            )
-            optimizer = optim.Lookahead(yogi, k=5, alpha=0.5)
-            network.optimizer = yogi
+            
+            optimizer = torch.optim.Adam(network.parameters())
+            network.optimizer = optimizer
             network.train_loader = train_loader
             network.test_loader = test_loader
             network.real_train_loader = real_train_loader
