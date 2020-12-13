@@ -34,7 +34,7 @@ from IPython.core.debugger import Pdb
 import random
 import csv
 
-n_epochs = 250
+n_epochs = 60
 batch_size_train = 256
 batch_size_test = 1000
 learning_rate = 0.001
