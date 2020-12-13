@@ -52,13 +52,11 @@ vals = [[],[],[],[]]
 def rl_loss(output, target):
     prob = output.detach()
     target_probs = (prob*target.float()).sum(dim=1)
-    mask = target == 1
+    mask = ((target == 1) & (prob > epsilon))
     loss = (prob[mask]*torch.log(output[mask])/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
     return -loss
 
 def naive_loss(output, target):
-    #print(output.shape)
-    #print(target.shape)
     batch_size = output.shape[0]
     loss = torch.bmm(output.view(output.shape[0], 1, output.shape[1]), target.view(output.shape[0], output.shape[1], 1))
     loss = torch.log(loss)
@@ -190,7 +188,7 @@ def make_partials(target, output_dim):
 
 
 datasets = ['KMNIST', 'FashionMNIST','MNIST']
-losses = [naive_loss, min_loss, rl_loss]
+losses = [naive_loss, rl_loss, min_loss]
 
 input_dim = 32*32
 output_dim = 10
@@ -274,7 +272,7 @@ for filename in datasets:
             for i in range(len(vals[0])):
                 writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
                 
-        for trial_no in range(1):
+        for trial_no in range(3):
             network = LeNet5(input_dim, output_dim)
             network.to(device)
             vals = [[],[],[],[]]
