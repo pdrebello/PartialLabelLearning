@@ -96,8 +96,11 @@ class Net(nn.Module):
         #print(torch.sum(target,dim=1))
         self.optimizer.zero_grad()
         output = network(data)
+        if(torch.isnan(output.sum())):
+            Pdb().set_trace()
         loss = loss_function(output, target)
-        
+        if(torch.isnan(loss)):
+            Pdb().set_trace()
         loss.backward()
         self.optimizer.step()
         if batch_idx % log_interval == 0:
