@@ -26,10 +26,10 @@ from IPython.core.debugger import Pdb
 import random
 import csv
 
-n_epochs = 300
-batch_size_train = 2000
+n_epochs = 250
+batch_size_train = 256
 batch_size_test = 1000
-learning_rate = 0.001
+learning_rate = 0.0001
 momentum = 0.5
 log_interval = 10
 
@@ -164,8 +164,8 @@ def make_partials(target, output_dim):
     
 
 
-datasets = ['MNIST', 'KMNIST', 'FashionMNIST']
-losses = [naive_loss, min_loss, rl_loss]
+datasets = ['KMNIST', 'FashionMNIST','MNIST']
+losses = [rl_loss, naive_loss, min_loss, ]
 
 input_dim = 784
 output_dim = 10
