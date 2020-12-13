@@ -32,6 +32,26 @@ class Dataset(torch.utils.data.Dataset):
 
         return X, y
 
+class ConvDataset(torch.utils.data.Dataset):
+  'Characterizes a dataset for PyTorch'
+  def __init__(self, data, labels):
+        'Initialization'
+        self.labels = labels.astype(np.float32)
+        self.data = data.astype(np.float32)
+
+  def __len__(self):
+        'Denotes the total number of samples'
+        return self.data.shape[0]
+
+  def __getitem__(self, index):
+        'Generates one sample of data'
+        X = np.asarray(self.data[index])
+        
+        y = np.asarray(self.labels[index]).flatten()
+       
+
+        return X, y
+    
 def loadTrain(filename):  
     mat = scipy.io.loadmat("datasets/"+filename)
     
