@@ -28,7 +28,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 #import torch_optimizer as optim
 import scipy.io
-from dataset import Dataset, loadTrain
+from dataset import Dataset, ConvDataset, loadTrain
 import sys
 from IPython.core.debugger import Pdb
 import random
