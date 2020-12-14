@@ -41,6 +41,8 @@ learning_rate = 0.001
 momentum = 0.5
 log_interval = 10
 
+epsilon = 1e-6
+
 random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
@@ -250,6 +252,8 @@ for filename in datasets:
     
     #loss = rl_loss
     for loss in losses:
+        if((filename == 'KMNIST') and ((loss == min_loss) or (loss == naive_loss))):
+            continue
         network = LeNet5(input_dim, output_dim)
         network.to(device)
         vals = [[],[],[],[]]
