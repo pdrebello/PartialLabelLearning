@@ -169,7 +169,7 @@ def make_partials(target, output_dim):
 #datasets = ['KMNIST', 'FashionMNIST','MNIST']
 #losses = [rl_loss, naive_loss, min_loss, ]
 
-datasets = ['MSRCv2','Yahoo! News','BirdSong','Soccer Player', 'Lost']
+datasets = ['MSRCv2','Yahoo! News','BirdSong','Soccer Player', 'lost']
 losses = [naive_loss, cc_loss, rl_loss,  min_loss]
 
 
