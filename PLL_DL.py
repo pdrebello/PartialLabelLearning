@@ -12,7 +12,7 @@ from IPython.core.debugger import Pdb
 import random
 import csv
 
-n_epochs = 400
+n_epochs = 300
 batch_size_train = 2000
 batch_size_test = 1000
 learning_rate = 0.001
@@ -36,7 +36,7 @@ def rl_loss(output, target):
     loss = (prob[mask]*torch.log(output[mask])/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
     return -loss
 
-def naive_loss(output, target):
+def cc_loss(output, target):
     #print(output.shape)
     #print(target.shape)
     batch_size = output.shape[0]
@@ -46,13 +46,25 @@ def naive_loss(output, target):
     loss = torch.div(loss, -batch_size)
     return loss
 
+def naive_loss(output, target):
+    
+    batch_size = output.shape[0]
+    loss = torch.log(output + epsilon)
+    normalize = torch.sum(target, dim = 1)
+    loss = torch.bmm(output.view(output.shape[0], 1, output.shape[1]), target.view(output.shape[0], output.shape[1], 1)).flatten()
+    loss = loss/normalize
+    loss = torch.sum(loss)
+    loss = torch.div(loss, -batch_size)
+    return loss
+
 def min_loss(output, target):
     batch_size = output.shape[0]
     loss = output * target
-    res = loss <= 0
-    loss[res] = 10000
-    loss = torch.min(loss, dim = 1).values
+    #res = loss <= 0
+    #loss[res] = -10000
+    loss = torch.max(loss, dim = 1).values
     loss = torch.log(loss)
+    
     loss = torch.sum(loss)
     loss = torch.div(loss, -batch_size)
     return loss
@@ -157,8 +169,8 @@ def make_partials(target, output_dim):
 #datasets = ['KMNIST', 'FashionMNIST','MNIST']
 #losses = [rl_loss, naive_loss, min_loss, ]
 
-datasets = ['Soccer Player']
-losses = [naive_loss, rl_loss,  min_loss]
+datasets = ['MSRCv2','Yahoo! News','BirdSong','Soccer Player', 'Lost']
+losses = [naive_loss, cc_loss, rl_loss,  min_loss]
 
 
 for filename in datasets:
@@ -173,27 +185,27 @@ for filename in datasets:
       batch_size=batch_size_test, shuffle=True)
     #loss = rl_loss
     for loss in losses:
-        network = Net(input_dim, output_dim)
-        network.to(device)
-        vals = [[],[],[],[]]
+        #network = Net(input_dim, output_dim)
+        #network.to(device)
+        #vals = [[],[],[],[]]
         
-        optimizer = torch.optim.Adam(network.parameters())
-        network.optimizer = optimizer
-        network.train_loader = real_train_loader
-        network.test_loader = test_loader
-        network.real_train_loader = real_train_loader
+        #optimizer = torch.optim.Adam(network.parameters())
+        #network.optimizer = optimizer
+        #network.train_loader = real_train_loader
+        #network.test_loader = test_loader
+        #network.real_train_loader = real_train_loader
         
-        f = open("results/"+filename+"_"+str(loss.__name__)+"_linear.txt","w")
+        #f = open("results/"+filename+"_"+str(loss.__name__)+"_linear.txt","w")
         
-        for epoch in range(1, n_epochs + 1):
-          network.myTrain(epoch, loss, vals)
-          network.myTest(loss, vals)
+        #for epoch in range(1, n_epochs + 1):
+        #  network.myTrain(epoch, loss, vals)
+        #  network.myTest(loss, vals)
           #print(vals)
-        with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str("PureLabels")+".csv","w", newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
-            for i in range(len(vals[0])):
-                writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
+       # with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str("PureLabels")+".csv","w", newline='') as file:
+       #     writer = csv.writer(file)
+       #     writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
+       #     for i in range(len(vals[0])):
+       #         writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
                
         for trial_no in range(5):
             print(filename)
@@ -218,16 +230,10 @@ for filename in datasets:
                 writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
                 for i in range(len(vals[0])):
                     writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
-        
 
 
-
-
-
-
-
-
-
+#small dev for early stopping
+#big dev for hyperparameters
 
 
 
