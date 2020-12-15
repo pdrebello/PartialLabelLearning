@@ -40,7 +40,7 @@ batch_size_test = 1000
 learning_rate = 0.001
 momentum = 0.5
 log_interval = 10
-
+epsilon = 1e-6
 random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
@@ -187,7 +187,7 @@ def make_partials(target, output_dim):
     
 
 
-datasets = ['KMNIST', 'FashionMNIST','MNIST']
+datasets = ['MNIST']
 losses = [naive_loss, rl_loss, min_loss]
 
 input_dim = 32*32
@@ -250,6 +250,8 @@ for filename in datasets:
     
     #loss = rl_loss
     for loss in losses:
+        if((filename == 'KMNIST') and ((loss == min_loss) or (loss == naive_loss))):
+            continue
         network = LeNet5(input_dim, output_dim)
         network.to(device)
         vals = [[],[],[],[]]
@@ -262,15 +264,15 @@ for filename in datasets:
         
         #f = open("results/"+filename+"_"+str(loss.__name__)+"_linear.txt","w")
         
-        for epoch in range(1, n_epochs + 1):
-          network.myTrain(epoch, loss, vals)
-          network.myTest(loss, vals)
-          #print(vals)
-        with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str("PureLabels_LeNet")+".csv","w", newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
-            for i in range(len(vals[0])):
-                writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
+       # for epoch in range(1, n_epochs + 1):
+        #  network.myTrain(epoch, loss, vals)
+        #  network.myTest(loss, vals)
+        #  #print(vals)
+       # with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str("PureLabels_LeNet")+".csv","w", newline='') as file:
+        #    writer = csv.writer(file)
+        #    writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
+        #    for i in range(len(vals[0])):
+        #        writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
                 
         for trial_no in range(3):
             network = LeNet5(input_dim, output_dim)
