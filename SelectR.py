@@ -112,7 +112,7 @@ class Phi_Net(nn.Module):
         self.bn2 = nn.BatchNorm1d(256)
 
     def forward(self, x, targetSet, rl_technique):
-        mask = targetSet.bool()
+        mask = targetSet>0
         
         x = x * targetSet.long()
         x = F.elu(self.bn1(self.fc1(x)))
