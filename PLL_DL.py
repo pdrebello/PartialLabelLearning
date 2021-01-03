@@ -4,6 +4,7 @@ import torch
 import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
+import os
 #import torch_optimizer as optim
 import scipy.io
 from dataset import Dataset, loadTrain
@@ -12,8 +13,8 @@ from IPython.core.debugger import Pdb
 import random
 import csv
 
-n_epochs = 300
-batch_size_train = 2000
+n_epochs = 100
+
 batch_size_test = 1000
 learning_rate = 0.001
 momentum = 0.5
@@ -37,11 +38,21 @@ def rl_loss(output, target):
     return -loss
 
 def cc_loss(output, target):
-    #print(output.shape)
-    #print(target.shape)
+    
     batch_size = output.shape[0]
     loss = torch.bmm(output.view(output.shape[0], 1, output.shape[1]), target.view(output.shape[0], output.shape[1], 1))
     loss = torch.log(loss)
+    loss = torch.sum(loss)
+    loss = torch.div(loss, -batch_size)
+    return loss
+
+def cour_loss(output, target):
+    batch_size = output.shape[0]
+    comp_output = (1 - output)/(output.shape[1]-1)
+    comp_target = 1 - target
+    comp_loss = torch.bmm(comp_output.view(comp_output.shape[0], 1, comp_output.shape[1]), comp_target.view(comp_output.shape[0], comp_output.shape[1], 1))
+    loss = torch.bmm(output.view(output.shape[0], 1, output.shape[1]), target.view(output.shape[0], output.shape[1], 1))
+    loss = torch.log(loss+comp_loss)
     loss = torch.sum(loss)
     loss = torch.div(loss, -batch_size)
     return loss
@@ -106,6 +117,7 @@ class Net(nn.Module):
           print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
             epoch, batch_idx * len(data), len(self.train_loader.dataset),
             100. * batch_idx / len(self.train_loader), loss.item()))
+          
       correct = 0
       with torch.no_grad():
           for data, target in self.real_train_loader:
@@ -123,13 +135,14 @@ class Net(nn.Module):
       #f.write("\n")
       vals[0].append(correct.item())
       vals[1].append(100. * float(correct.item()) / len(self.real_train_loader.dataset))
-
-    def myTest(self, loss_function, vals):
+      
+    
+    def myTest(self, loss_function, vals, test_loader):
         self.eval()
         test_loss = 0
         correct = 0
         with torch.no_grad():
-            for data, target in self.test_loader:
+            for data, target in test_loader:
                 data, target = data.to(device), target.to(device)
                 output = self.forward(data)
                 pred = output.data.max(1, keepdim=True)[1]
@@ -137,78 +150,51 @@ class Net(nn.Module):
                 correct += pred.eq(targ_pred.data.view_as(pred)).sum()
           
           
-        test_loss /= len(self.test_loader.dataset)
+        test_loss /= len(test_loader.dataset)
         print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-                test_loss, correct, len(self.test_loader.dataset),
-                100. * correct / len(self.test_loader.dataset)))
-        #f.write()
-        #f.write('Test: {}/{} ({:.0f}%)\n'.format(
-        #        test_loss, correct, len(self.test_loader.dataset),
-        #        100. * correct / len(self.test_loader.dataset)))
-        #f.write("\n")
+                test_loss, correct, len(test_loader.dataset),
+                100. * correct / len(test_loader.dataset)))
+        
         vals[2].append(correct.item())
-        vals[3].append(100. * float(correct.item()) / len(self.test_loader.dataset))
-
+        vals[3].append(100. * float(correct.item()) / len(test_loader.dataset))
+        return (100. * float(correct.item()) / len(test_loader.dataset))
 
 def one_hot_embedding(labels, num_classes):
     y = torch.eye(num_classes) 
     return y[labels]
 
 def make_partials(target, output_dim):
-    #options = [1,2,3,4]
-    #howmany = random.choice(options)
     for i in target:
         rand = torch.FloatTensor(output_dim).uniform_() > 0.5
-        #index_options = list(range(output_dim))
-        #indices = random.sample(index_options, howmany)
         i[rand] = 1
     return target
     
 
-
-#datasets = ['KMNIST', 'FashionMNIST','MNIST']
-#losses = [rl_loss, naive_loss, min_loss, ]
-
-datasets = ['MSRCv2','Yahoo! News','BirdSong','Soccer Player', 'lost']
-losses = [naive_loss, cc_loss, rl_loss,  min_loss]
+k = 10
+datasets = ['Soccer Player','MSRCv2','lost','BirdSong','Yahoo! News']
+losses = [cc_loss, naive_loss, rl_loss,  min_loss]
 
 
 for filename in datasets:
-    
-    
-    train_dataset, test_dataset, real_train_dataset, input_dim, output_dim = loadTrain(filename+".mat")
-    train_loader = torch.utils.data.DataLoader(train_dataset,
-      batch_size=batch_size_train, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset,
-      batch_size=batch_size_test, shuffle=True)
-    real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
-      batch_size=batch_size_test, shuffle=True)
-    #loss = rl_loss
+    if(filename == 'lost'):
+        batch_size_train = 4
+    else:
+        batch_size_train = 64
     for loss in losses:
-        #network = Net(input_dim, output_dim)
-        #network.to(device)
-        #vals = [[],[],[],[]]
-        
-        #optimizer = torch.optim.Adam(network.parameters())
-        #network.optimizer = optimizer
-        #network.train_loader = real_train_loader
-        #network.test_loader = test_loader
-        #network.real_train_loader = real_train_loader
-        
-        #f = open("results/"+filename+"_"+str(loss.__name__)+"_linear.txt","w")
-        
-        #for epoch in range(1, n_epochs + 1):
-        #  network.myTrain(epoch, loss, vals)
-        #  network.myTest(loss, vals)
-          #print(vals)
-       # with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str("PureLabels")+".csv","w", newline='') as file:
-       #     writer = csv.writer(file)
-       #     writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
-       #     for i in range(len(vals[0])):
-       #         writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
-               
-        for trial_no in range(5):
-            print(filename)
+    
+        for fold_no in range(k):
+            
+            train_dataset, test_dataset, real_train_dataset, val_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
+            
+            train_loader = torch.utils.data.DataLoader(train_dataset,
+              batch_size=batch_size_train, shuffle=True)
+            test_loader = torch.utils.data.DataLoader(test_dataset,
+              batch_size=batch_size_test, shuffle=True)
+            real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
+              batch_size=batch_size_train, shuffle=True)
+            val_loader = torch.utils.data.DataLoader(val_dataset,
+              batch_size=batch_size_train, shuffle=True)
+            
             network = Net(input_dim, output_dim)
             network.to(device)
             vals = [[],[],[],[]]
@@ -218,22 +204,42 @@ for filename in datasets:
             network.train_loader = train_loader
             network.test_loader = test_loader
             network.real_train_loader = real_train_loader
+            network.val_loader = val_loader
             
-            #f = open("results/"+filename+"_"+str(loss.__name__)+"_linear.txt","w")
-            
+            best_val = 0
+            result_filename = "results/"+filename+"/"+str(loss.__name__)+"/results/"+str(fold_no)+"_out.txt"
+            result_log_filename = "results/"+filename+"/"+str(loss.__name__)+"/logs/"+str(fold_no)+"_log.csv"
+            model_filename = "results/"+filename+"/"+str(loss.__name__)+"/models/"+str(fold_no)+"_best.pth"
+               
             for epoch in range(1, n_epochs + 1):
               network.myTrain(epoch, loss, vals)
-              network.myTest(loss, vals)
-              #print(vals)
-            with open("results/"+filename+"/"+filename+"_"+str(loss.__name__)+"_"+str(trial_no)+".csv","w", newline='') as file:
+              val = network.myTest(loss, vals, val_loader)
+                 
+              if(val > best_val):
+                  best_val = val
+                  os.makedirs(os.path.dirname(model_filename), exist_ok=True)
+                  torch.save(network.state_dict(), model_filename)
+              
+            
+            network.load_state_dict(torch.load(model_filename))
+            train_acc = network.myTest(loss, vals, real_train_loader)
+            val_acc = network.myTest(loss, vals, val_loader)
+            test_acc = network.myTest(loss, vals, test_loader)
+            
+            os.makedirs(os.path.dirname(result_filename), exist_ok=True)
+            with open(result_filename,"w", newline='') as file:
+                file.write(str(train_acc)+"\n")
+                file.write(str(val_acc)+"\n")
+                file.write(str(test_acc)+"\n")
+                
+            os.makedirs(os.path.dirname(result_log_filename), exist_ok=True)
+            with open(result_log_filename,"w", newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
                 for i in range(len(vals[0])):
                     writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
 
 
-#small dev for early stopping
-#big dev for hyperparameters
 
 
 
