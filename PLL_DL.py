@@ -219,7 +219,11 @@ for filename in datasets:
                   best_val = val
                   os.makedirs(os.path.dirname(model_filename), exist_ok=True)
                   torch.save(network.state_dict(), model_filename)
-              
+              if((epoch%10==0) and (epoch>0)):
+                  e_model_filename = "results/"+filename+"/"+str(loss.__name__)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
+                  os.makedirs(os.path.dirname(e_model_filename), exist_ok=True)
+                  torch.save(network.state_dict(), e_model_filename)
+            
             
             network.load_state_dict(torch.load(model_filename))
             train_acc = network.myTest(loss, vals, real_train_loader)
