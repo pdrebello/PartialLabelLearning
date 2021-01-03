@@ -18,7 +18,7 @@ import random
 import csv
 import os
 
-n_epochs = 1
+n_epochs = 150
 batch_size_train = 64
 batch_size_test = 1000
 learning_rate = 0.001
@@ -298,7 +298,7 @@ for tech in ["sample","select"]:
             model_filename = "results/"+filename+"/"+str("SelectR")+"/models/"+str(fold_no)+"_best.pth"
             
             
-            load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_best.pth"
+            load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
             p_net.load_state_dict(torch.load(load_pre_train))
             s_net.p_net.copy(p_net)
             
