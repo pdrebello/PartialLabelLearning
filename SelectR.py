@@ -114,7 +114,7 @@ class Phi_Net(nn.Module):
     def forward(self, x, targetSet, rl_technique):
         mask = targetSet>0
         
-        x = x * targetSet.long()
+        x = x * targetSet
         x = F.elu(self.bn1(self.fc1(x)))
         x = F.elu(self.bn2(self.fc2(x)))
         x = self.fc3(x)
@@ -264,7 +264,7 @@ def test(test_data):
 
 k = 10
 
-datasets = ['lost','Soccer Player','MSRCv2','BirdSong','Yahoo! News']
+datasets = ['Soccer Player','MSRCv2','BirdSong','Yahoo! News','lost',]
 
 for tech in ["sample","select"]:
     for filename in datasets:
