@@ -264,7 +264,7 @@ def test(test_data):
 
 k = 10
 
-datasets = ['Soccer Player','MSRCv2','lost','BirdSong','Yahoo! News']
+datasets = ['lost','Soccer Player','MSRCv2','BirdSong','Yahoo! News']
 
 for tech in ["sample","select"]:
     for filename in datasets:
@@ -284,6 +284,9 @@ for tech in ["sample","select"]:
             
             p_net = Prediction_Net(input_dim, output_dim)
             s_net = Selection_Net(input_dim, output_dim)
+            
+            p_net.to(device)
+            s_net.to(device)
             
             p_optimizer = torch.optim.Adam(p_net.parameters())
             s_optimizer = torch.optim.Adam(s_net.parameters())
