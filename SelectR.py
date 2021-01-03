@@ -71,9 +71,6 @@ def sample_reward_function(p, q, a, mask):
     return -torch.mean(rew * lap)
 
 def sample_loss_function(p, a):
-    
-    #loss = torch.log((a*p + (1-a)*(1-p)).sum(dim=1))
-    #
     loss = torch.log((a*p).sum(dim=1) +epsilon)
     return -torch.mean(loss)
 
@@ -264,78 +261,80 @@ def test(test_data):
 
 k = 10
 
-datasets = ['Soccer Player','MSRCv2','BirdSong','Yahoo! News','lost',]
+datasets = ['Soccer Player','lost','MSRCv2','BirdSong','Yahoo! News']
 
-for tech in ["sample","select"]:
-    for filename in datasets:
-        for fold_no in range(k):
-            
-            train_dataset, test_dataset, real_train_dataset, val_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
-            train_loader = torch.utils.data.DataLoader(train_dataset,
-              batch_size=batch_size_train, shuffle=True)
-            test_loader = torch.utils.data.DataLoader(test_dataset,
-              batch_size=batch_size_test, shuffle=True)
-            val_loader = torch.utils.data.DataLoader(val_dataset,
-              batch_size=batch_size_test, shuffle=True)
-            real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
-              batch_size=batch_size_train, shuffle=True)
-            
-            vals = [[],[],[],[]]
-            
-            p_net = Prediction_Net(input_dim, output_dim)
-            s_net = Selection_Net(input_dim, output_dim)
-            
-            p_net.to(device)
-            s_net.to(device)
-            
-            p_optimizer = torch.optim.Adam(p_net.parameters())
-            s_optimizer = torch.optim.Adam(s_net.parameters())
-        
-        
-            best_val = 0
-            result_filename = "results/"+filename+"/SelectR_"+str(tech)+"/results/"+str(fold_no)+"_out.txt"
-            result_log_filename = "results/"+filename+"/SelectR_"+str(tech)+"/logs/"+str(fold_no)+"_log.csv"
-            model_filename = "results/"+filename+"/SelectR_"+str(tech)+"/models/"+str(fold_no)+"_best.pth"
-            
-            
-            load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
-            p_net.load_state_dict(torch.load(load_pre_train))
-            s_net.p_net.copy(p_net)
-            
-            #for epoch in range(1, 1):
-            #    pre_train(epoch)
-            #    test()
-            #s_net.p_net.copy(p_net)
-        
-        
-            for epoch in range(1, n_epochs + 1):
-              train(epoch, tech)
-              val = test(val_loader)
-              
-              if(val > best_val):
-                  best_val = val
-                  os.makedirs(os.path.dirname(model_filename), exist_ok=True)
-                  torch.save(p_net.state_dict(), model_filename)
-              if((epoch%10==0) and (epoch>0)):
-                  e_model_filename = "results/"+filename+"/SelectR_"+str(tech)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
-                  os.makedirs(os.path.dirname(e_model_filename), exist_ok=True)
-                  torch.save(p_net.state_dict(), e_model_filename)
-            
-            
-            p_net.load_state_dict(torch.load(model_filename))
-            train_acc = test(real_train_loader)
-            val_acc = test(val_loader)
-            test_acc = test(test_loader)
-            
-            os.makedirs(os.path.dirname(result_filename), exist_ok=True)
-            with open(result_filename,"w", newline='') as file:
-                file.write(str(train_acc)+"\n")
-                file.write(str(val_acc)+"\n")
-                file.write(str(test_acc)+"\n")
+
+for filename in datasets:
+    for tech in ["sample","select"]:
+        for pretrain in [False,True]:
+            for fold_no in range(k):
                 
-            os.makedirs(os.path.dirname(result_log_filename), exist_ok=True)
-            with open(result_log_filename,"w", newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
-                for i in range(len(vals[0])):
-                    writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
+                train_dataset, test_dataset, real_train_dataset, val_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
+                train_loader = torch.utils.data.DataLoader(train_dataset,
+                  batch_size=batch_size_train, shuffle=True)
+                test_loader = torch.utils.data.DataLoader(test_dataset,
+                  batch_size=batch_size_test, shuffle=True)
+                val_loader = torch.utils.data.DataLoader(val_dataset,
+                  batch_size=batch_size_test, shuffle=True)
+                real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
+                  batch_size=batch_size_train, shuffle=True)
+                
+                vals = [[],[],[],[]]
+                
+                p_net = Prediction_Net(input_dim, output_dim)
+                s_net = Selection_Net(input_dim, output_dim)
+                
+                p_net.to(device)
+                s_net.to(device)
+                
+                p_optimizer = torch.optim.Adam(p_net.parameters())
+                s_optimizer = torch.optim.Adam(s_net.parameters())
+            
+            
+                best_val = 0
+                result_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/results/"+str(fold_no)+"_out.txt"
+                result_log_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/logs/"+str(fold_no)+"_log.csv"
+                model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/models/"+str(fold_no)+"_best.pth"
+                
+                if(pretrain == True):
+                    load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
+                    p_net.load_state_dict(torch.load(load_pre_train))
+                    s_net.p_net.copy(p_net)
+                
+                #for epoch in range(1, 1):
+                #    pre_train(epoch)
+                #    test()
+                #s_net.p_net.copy(p_net)
+            
+            
+                for epoch in range(1, n_epochs + 1):
+                  train(epoch, tech)
+                  val = test(val_loader)
+                  
+                  if(val > best_val):
+                      best_val = val
+                      os.makedirs(os.path.dirname(model_filename), exist_ok=True)
+                      torch.save(p_net.state_dict(), model_filename)
+                  if((epoch%10==0) and (epoch>0)):
+                      e_model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
+                      os.makedirs(os.path.dirname(e_model_filename), exist_ok=True)
+                      torch.save(p_net.state_dict(), e_model_filename)
+                
+                
+                p_net.load_state_dict(torch.load(model_filename))
+                train_acc = test(real_train_loader)
+                val_acc = test(val_loader)
+                test_acc = test(test_loader)
+                
+                os.makedirs(os.path.dirname(result_filename), exist_ok=True)
+                with open(result_filename,"w", newline='') as file:
+                    file.write(str(train_acc)+"\n")
+                    file.write(str(val_acc)+"\n")
+                    file.write(str(test_acc)+"\n")
+                    
+                os.makedirs(os.path.dirname(result_log_filename), exist_ok=True)
+                with open(result_log_filename,"w", newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(["Train Count", "Train Acc", "Test Count", "Test Acc"])
+                    for i in range(len(vals[0])):
+                        writer.writerow([vals[0][i], vals[1][i], vals[2][i], vals[3][i]])
