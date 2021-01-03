@@ -199,7 +199,7 @@ def train(epoch, rl_technique):
             with torch.no_grad():
                 m = torch.distributions.bernoulli.Bernoulli(q)
                 a = m.sample()
-            mask = target.long()
+            mask = target
             reward = sample_reward_function(p.detach(), q, a, mask)
             loss = sample_loss_function(p, a)
         else:
