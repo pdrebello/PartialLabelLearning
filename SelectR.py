@@ -293,9 +293,9 @@ for tech in ["sample","select"]:
         
         
             best_val = 0
-            result_filename = "results/"+filename+"/"+str("SelectR")+"/results/"+str(fold_no)+"_out.txt"
-            result_log_filename = "results/"+filename+"/"+str("SelectR")+"/logs/"+str(fold_no)+"_log.csv"
-            model_filename = "results/"+filename+"/"+str("SelectR")+"/models/"+str(fold_no)+"_best.pth"
+            result_filename = "results/"+filename+"/SelectR_"+str(tech)+"/results/"+str(fold_no)+"_out.txt"
+            result_log_filename = "results/"+filename+"/SelectR_"+str(tech)+"/logs/"+str(fold_no)+"_log.csv"
+            model_filename = "results/"+filename+"/SelectR_"+str(tech)+"/models/"+str(fold_no)+"_best.pth"
             
             
             load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
@@ -317,7 +317,7 @@ for tech in ["sample","select"]:
                   os.makedirs(os.path.dirname(model_filename), exist_ok=True)
                   torch.save(p_net.state_dict(), model_filename)
               if((epoch%10==0) and (epoch>0)):
-                  e_model_filename = "results/"+filename+"/SelectR/models/"+str(fold_no)+"_"+str(epoch)+".pth"
+                  e_model_filename = "results/"+filename+"/SelectR_"+str(tech)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
                   os.makedirs(os.path.dirname(e_model_filename), exist_ok=True)
                   torch.save(p_net.state_dict(), e_model_filename)
             
