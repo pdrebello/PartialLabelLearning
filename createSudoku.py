@@ -48,8 +48,8 @@ def make_target(query, target, number, method, count):
     
     elif(method == "flip"):
         indices = np.argwhere(query == 0).flatten()
-        #results = [target]
-        results = []
+        results = [target]
+        
         options = [1,2,3,4,5,6,7,8,9]
         for j in range(number):
             new_target = target.copy()
@@ -60,11 +60,25 @@ def make_target(query, target, number, method, count):
             results.append(new_target)
         random.shuffle(results)
         return results
-        
+    
+def make_noisy_target(query, target, number, method, count):
+    indices = np.argwhere(query == 0).flatten()
+    
+    results = []
+    options = [1,2,3,4,5,6,7,8,9]
+    for j in range(number):
+        new_target = target.copy()
+        for k in list(indices):
+            if(flip_coin(count)):
+                new_target[k] = random.choice(options)
+                
+        results.append(new_target)
+    random.shuffle(results)
+    return results        
         
 
 
-filenames = ["temp/sudoku_9_train_e_unq_10k.pkl"]
+filenames = ["sudoku_9_train_e_unq_10k.pkl"]
 
 random.seed(10)
 
@@ -77,17 +91,20 @@ for fn in filenames:
             
             for sample in data:
                 new_sample = sample.copy()
+                
+                #Commands for partial_labels
                 #new_target_set = make_target(sample["query"], sample["target_set"][0],5)
                 #new_target_set = make_target(sample["query"], sample["target_set"][0],5, "shuffle", 8)
-                new_target_set = make_target(sample["query"], sample["target_set"][0],1, "flip", prob)
+                
+                #Command for noisy target
+                new_target_set = make_noisy_target(sample["query"], sample["target_set"][0],1, "flip", prob)
                 
                 new_sample["target_set"] = new_target_set
                 new_sample["count"] = len(new_target_set)
                 new_data.append(new_sample)
-                #print(new_sample)
-                #break
                 
-        with open("temp/sudoku_9_train_e_unq_noisy_10k_shuffle_"+str(prob)+".pkl",'wb') as f:
+                
+        with open("sudoku_9_train_e_unq_noisy_10k_shuffle_"+str(prob)+".pkl",'wb') as f:
             pickle.dump(new_data,f)
         
         
