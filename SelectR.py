@@ -97,9 +97,13 @@ class Prediction_Net(nn.Module):
     
 
 class Phi_Net(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, input_x):
         super(Phi_Net, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 512)
+        if(input_x):
+            self.fc1 = nn.Linear(input_dim+output_dim, 512)
+        else:
+            self.fc1 = nn.Linear(input_dim, 512)
+        
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, output_dim)
         torch.nn.init.xavier_uniform(self.fc1.weight)
@@ -108,10 +112,14 @@ class Phi_Net(nn.Module):
         self.bn1 = nn.BatchNorm1d(512)
         self.bn2 = nn.BatchNorm1d(256)
 
-    def forward(self, x, targetSet, rl_technique):
+    def forward(self, x, p, targetSet, rl_technique):
         mask = targetSet>0
         
-        x = x * targetSet
+        p = p * targetSet
+        
+        if(input_x):
+            x = torch.cat((x, p), 1)
+        
         x = F.elu(self.bn1(self.fc1(x)))
         x = F.elu(self.bn2(self.fc2(x)))
         x = self.fc3(x)
@@ -126,20 +134,20 @@ class Phi_Net(nn.Module):
         self.load_state_dict(net2.state_dict())
 
 class Selection_Net(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, input_x):
         super(Selection_Net, self).__init__()
         
         self.p_net = Prediction_Net(input_dim, output_dim)
         for param in self.p_net.parameters():
             param.requires_grad = False
             
-        self.phi_net = Phi_Net(output_dim, output_dim)
+        self.phi_net = Phi_Net(input_dim, output_dim, input_x)
 
     def forward(self, x, targetSet, rl_technique):
         with torch.no_grad():
-            x = self.p_net(x)
+            p = self.p_net(x)
         
-        x = self.phi_net(x, targetSet, rl_technique)
+        x = self.phi_net(x, p, targetSet, rl_technique)
         return x
 
 def pre_train(epoch):
@@ -266,9 +274,9 @@ datasets = ['Soccer Player','lost','MSRCv2','BirdSong','Yahoo! News']
 
 for filename in datasets:
     for tech in ["sample","select"]:
-        for pretrain in [False,True]:
+        for input_x in [False,True]:
             for fold_no in range(k):
-                
+            #for fold_no in [0]:  
                 train_dataset, test_dataset, real_train_dataset, val_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
                 train_loader = torch.utils.data.DataLoader(train_dataset,
                   batch_size=batch_size_train, shuffle=True)
@@ -282,7 +290,7 @@ for filename in datasets:
                 vals = [[],[],[],[]]
                 
                 p_net = Prediction_Net(input_dim, output_dim)
-                s_net = Selection_Net(input_dim, output_dim)
+                s_net = Selection_Net(input_dim, output_dim, input_x)
                 
                 p_net.to(device)
                 s_net.to(device)
@@ -292,14 +300,18 @@ for filename in datasets:
             
             
                 best_val = 0
-                result_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/results/"+str(fold_no)+"_out.txt"
-                result_log_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/logs/"+str(fold_no)+"_log.csv"
-                model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/models/"+str(fold_no)+"_best.pth"
+                result_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/results/"+str(fold_no)+"_out.txt"
+                result_log_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/logs/"+str(fold_no)+"_log.csv"
+                model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
                 
-                if(pretrain == True):
-                    load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
-                    p_net.load_state_dict(torch.load(load_pre_train))
-                    s_net.p_net.copy(p_net)
+                
+                
+                
+                
+                
+                load_pre_train = "results/05012020/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
+                p_net.load_state_dict(torch.load(load_pre_train))
+                s_net.p_net.copy(p_net)
                 
                 #for epoch in range(1, 1):
                 #    pre_train(epoch)
@@ -311,17 +323,27 @@ for filename in datasets:
                   train(epoch, tech)
                   val = test(val_loader)
                   
+                  checkpoint = {
+                        'epoch': epoch,
+                        'va_acc': val,
+                        'p_net_state_dict': p_net.state_dict(),
+                        'p_optimizer': p_optimizer.state_dict(),
+                        's_net_state_dict': s_net.state_dict(),
+                        's_optimizer': s_optimizer.state_dict(),
+                    }
+                  
+                  
                   if(val > best_val):
                       best_val = val
                       os.makedirs(os.path.dirname(model_filename), exist_ok=True)
-                      torch.save(p_net.state_dict(), model_filename)
+                      torch.save(checkpoint, model_filename)
                   if((epoch%10==0) and (epoch>0)):
-                      e_model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(pretrain)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
+                      e_model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
                       os.makedirs(os.path.dirname(e_model_filename), exist_ok=True)
-                      torch.save(p_net.state_dict(), e_model_filename)
+                      torch.save(checkpoint, e_model_filename)
                 
-                
-                p_net.load_state_dict(torch.load(model_filename))
+                checkpoint = torch.load(model_filename)
+                p_net.load_state_dict(checkpoint['p_net_state_dict'])
                 train_acc = test(real_train_loader)
                 val_acc = test(val_loader)
                 test_acc = test(test_loader)
