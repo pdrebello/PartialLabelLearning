@@ -309,7 +309,7 @@ for filename in datasets:
                 
                 
                 
-                load_pre_train = "results/05012020/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
+                load_pre_train = "results/"+filename+"/"+str("cc_loss")+"/models/"+str(fold_no)+"_10.pth"
                 p_net.load_state_dict(torch.load(load_pre_train))
                 s_net.p_net.copy(p_net)
                 
