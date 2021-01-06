@@ -28,7 +28,7 @@ import os
 
 n_epochs = 150
 batch_size_train = 64
-batch_size_test = 1000
+batch_size_test = 64
 learning_rate = 0.001
 momentum = 0.5
 log_interval = 10
@@ -39,7 +39,7 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 vals = [[],[],[],[]]
 
