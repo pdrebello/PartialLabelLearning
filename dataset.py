@@ -32,6 +32,27 @@ class Dataset(torch.utils.data.Dataset):
        
 
         return X, y
+    
+class DatasetAnalysis(torch.utils.data.Dataset):
+  'Characterizes a dataset for PyTorch'
+  def __init__(self, data, partials, target):
+        'Initialization'
+        self.data = data.astype(np.float32)
+        self.partials = partials.astype(np.float32)
+        self.target = target.astype(np.float32)
+
+  def __len__(self):
+        'Denotes the total number of samples'
+        return self.data.shape[0]
+
+  def __getitem__(self, index):
+        'Generates one sample of data'
+        X = np.asarray(self.data[index]).flatten()
+        p = np.asarray(self.partials[index]).flatten()
+        y = np.asarray(self.target[index]).flatten()
+       
+
+        return X, p, y
 
 class ConvDataset(torch.utils.data.Dataset):
   'Characterizes a dataset for PyTorch'
@@ -216,27 +237,27 @@ def loadTrainAnalysis(filename, fold_no, k):
     
     dic = {}
     
-    dic["train_data"] = torch.from_numpy(np.vstack(train_data_list)).float()
-    dic["train_target"] = torch.from_numpy(np.vstack(train_target_list)).float()
-    dic["train_partials"] = torch.from_numpy(np.vstack(train_partials_list)).float()
+    dic["train_data"] = np.vstack(train_data_list)
+    dic["train_target"] = np.vstack(train_target_list)
+    dic["train_partials"] = np.vstack(train_partials_list)
     
-    dic["test_data"] = torch.from_numpy(np.vstack(test_data_list)).float()
-    dic["test_target"] = torch.from_numpy(np.vstack(test_target_list)).float()
-    dic["test_partials"] = torch.from_numpy(np.vstack(test_partials_list)).float()
+    dic["test_data"] = np.vstack(test_data_list)
+    dic["test_target"] = np.vstack(test_target_list)
+    dic["test_partials"] = np.vstack(test_partials_list)
     
-    dic["val_data"] = torch.from_numpy(np.vstack(val_data_list)).float()
-    dic["val_target"] = torch.from_numpy(np.vstack(val_target_list)).float()
-    dic["val_partials"] = torch.from_numpy(np.vstack(val_partials_list)).float()
+    dic["val_data"] = np.vstack(val_data_list)
+    dic["val_target"] = np.vstack(val_target_list)
+    dic["val_partials"] = np.vstack(val_partials_list)
     
     
-    #train_dataset = Dataset(train_data, train_partials)
-    #test_dataset = Dataset(test_data, test_partials)
-    #val_dataset = Dataset(val_data, val_partials)
+    train_dataset = DatasetAnalysis(dic["train_data"], dic["train_partials"], dic["train_target"])
+    val_dataset = DatasetAnalysis(dic["val_data"], dic["val_partials"], dic["val_target"])
+    test_dataset = DatasetAnalysis(dic["test_data"], dic["test_partials"], dic["test_target"])
     #real_train_dataset = Dataset(train_data, train_target)
     #real_test_dataset = Dataset(test_data, test_target)
     #real_val_dataset = Dataset(val_data, val_target)
     #return train_data, test_data
-    return dic, data.shape[1], partials.shape[1]
+    return train_dataset, val_dataset, test_dataset, data.shape[1], partials.shape[1]
 
 #a = loadTrain('MSRCv2.mat',4,10)
 #tr = list(a[0])

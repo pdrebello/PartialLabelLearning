@@ -159,25 +159,26 @@ class Selection_Net(nn.Module):
         return x
 
 
-def test(data, partial, target, input_x):
+def test(test_data, input_x):
     p_net.eval()
     
     pred_list = []
     s_pred_list = []
     targ_pred_list = []
     with torch.no_grad():
-        
-        data, partial, target = data.to(device), partial.to(device), target.to(device)
-        output = p_net.forward(data)
-        s_output = s_net.forward(data, partial, input_x)
-        
-        pred = output.data.max(1, keepdim=True)[1]
-        s_pred = s_output.data.max(1, keepdim=True)[1]
-        targ_pred = target.data.max(1, keepdim=True)[1]
-        
-        pred_list.append(pred)
-        s_pred_list.append(s_pred)
-        targ_pred_list.append(targ_pred)
+        for data, partial, target in test_data:
+            #data, target = data.to(device), target.to(device)
+            data, partial, target = data.to(device), partial.to(device), target.to(device)
+            output = p_net.forward(data)
+            s_output = s_net.forward(data, partial, input_x)
+            
+            pred = output.data.max(1, keepdim=True)[1]
+            s_pred = s_output.data.max(1, keepdim=True)[1]
+            targ_pred = target.data.max(1, keepdim=True)[1]
+            
+            pred_list.append(pred)
+            s_pred_list.append(s_pred)
+            targ_pred_list.append(targ_pred)
     pred = torch.vstack(pred_list)
     s_pred = torch.vstack(s_pred_list)
     targ_pred_list = torch.vstack(targ_pred_list)
@@ -194,7 +195,14 @@ for filename in datasets:
         for input_x in [False,True]:
             for fold_no in range(k):
               
-                dic, input_dim, output_dim = loadTrainAnalysis(filename+".mat", fold_no, k)
+                train_dataset, val_dataset, test_dataset, input_dim, output_dim = loadTrainAnalysis(filename+".mat", fold_no, k)
+                train_loader = torch.utils.data.DataLoader(train_dataset,
+                  batch_size=batch_size_train, shuffle=True)
+                test_loader = torch.utils.data.DataLoader(test_dataset,
+                  batch_size=batch_size_test, shuffle=True)
+                val_loader = torch.utils.data.DataLoader(val_dataset,
+                  batch_size=batch_size_test, shuffle=True)
+                
                 
                 p_net = Prediction_Net(input_dim, output_dim)
                 s_net = Selection_Net(input_dim, output_dim, input_x)
@@ -210,9 +218,9 @@ for filename in datasets:
                 p_net.load_state_dict(checkpoint['p_net_state_dict'])
                 s_net.load_state_dict(checkpoint['s_net_state_dict'])
                 
-                train_dic = test(dic["train_data"],dic["train_target"],dic["train_partials"], input_x)
-                val_dic = test(dic["val_data"],dic["val_target"],dic["val_partials"], input_x)
-                test_dic = test(dic["test_data"],dic["test_target"],dic["test_partials"], input_x)
+                train_dic = test(train_dataset, input_x)
+                val_dic = test(val_dataset, input_x)
+                test_dic = test(test_dataset, input_x)
                 
     
                 #os.makedirs(os.path.dirname(result_filename), exist_ok=True)
