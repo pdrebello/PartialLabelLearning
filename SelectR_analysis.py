@@ -207,46 +207,46 @@ k = 10
 
 datasets = ['Soccer Player','lost','MSRCv2','BirdSong','Yahoo! News']
 
-def create_files():
-    for filename in datasets:
-        for tech in ["sample","select"]:
-            for input_x in [True,False]:
-                for fold_no in range(k):
-                    
-                    train_dataset, val_dataset, test_dataset, input_dim, output_dim = loadTrainAnalysis(filename+".mat", fold_no, k)
-                    train_loader = torch.utils.data.DataLoader(train_dataset,
-                      batch_size=batch_size_train, shuffle=True)
-                    test_loader = torch.utils.data.DataLoader(test_dataset,
-                      batch_size=batch_size_test, shuffle=True)
-                    val_loader = torch.utils.data.DataLoader(val_dataset,
-                      batch_size=batch_size_test, shuffle=True)
-                    
-                    
-                    p_net = Prediction_Net(input_dim, output_dim)
-                    s_net = Selection_Net(input_dim, output_dim, input_x)
-                    
-                    p_net.to(device)
-                    s_net.to(device)
+#def create_files():
+for filename in datasets:
+    for tech in ["sample","select"]:
+        for input_x in [True,False]:
+            for fold_no in range(k):
                 
-                    
-                    #model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
-                    model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
-                    
-                    checkpoint = torch.load(model_filename)
-                    p_net.load_state_dict(checkpoint['p_net_state_dict'])
-                    s_net.load_state_dict(checkpoint['s_net_state_dict'])
-                    
-                    train_table = test(train_loader, input_x, p_net, s_net)
-                    val_table = test(val_loader, input_x, p_net, s_net)
-                    test_table = test(test_loader, input_x, p_net, s_net)
-                    
-                    result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
-                    
-                    os.makedirs(os.path.dirname(result_filename), exist_ok=True)
-                    with open(result_filename,"wb") as file:
-                        pickle.dump(train_table.cpu().detach().numpy(), file)
-                        pickle.dump(val_table.cpu().detach().numpy(), file)
-                        pickle.dump(test_table.cpu().detach().numpy(), file)
+                train_dataset, val_dataset, test_dataset, input_dim, output_dim = loadTrainAnalysis(filename+".mat", fold_no, k)
+                train_loader = torch.utils.data.DataLoader(train_dataset,
+                  batch_size=batch_size_train, shuffle=True)
+                test_loader = torch.utils.data.DataLoader(test_dataset,
+                  batch_size=batch_size_test, shuffle=True)
+                val_loader = torch.utils.data.DataLoader(val_dataset,
+                  batch_size=batch_size_test, shuffle=True)
+                
+                
+                p_net = Prediction_Net(input_dim, output_dim)
+                s_net = Selection_Net(input_dim, output_dim, input_x)
+                
+                p_net.to(device)
+                s_net.to(device)
+            
+                
+                #model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
+                model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
+                
+                checkpoint = torch.load(model_filename)
+                p_net.load_state_dict(checkpoint['p_net_state_dict'])
+                s_net.load_state_dict(checkpoint['s_net_state_dict'])
+                
+                train_table = test(train_loader, input_x, p_net, s_net)
+                val_table = test(val_loader, input_x, p_net, s_net)
+                test_table = test(test_loader, input_x, p_net, s_net)
+                
+                result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
+                
+                os.makedirs(os.path.dirname(result_filename), exist_ok=True)
+                with open(result_filename,"wb") as file:
+                    pickle.dump(train_table.cpu().detach().numpy(), file)
+                    pickle.dump(val_table.cpu().detach().numpy(), file)
+                    pickle.dump(test_table.cpu().detach().numpy(), file)
 
 def counter(table):
     count = 0
@@ -267,4 +267,4 @@ def parse_files():
                         test_table = pickle.load(file)
                     counter(test_table)
 #parse_files()
-create_files()
+#create_files()
