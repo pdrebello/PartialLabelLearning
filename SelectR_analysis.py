@@ -250,12 +250,26 @@ def create_files():
                         pickle.dump(val_table, file)
                         pickle.dump(test_table, file)
 
-def counter(table):
-    count = 0
+def counter(table, rf):
+    pq_count = 0
+    pt_count = 0
+    qt_count = 0
+    
     for i in table:
-        if(i[0] != i[1]):
-            count+=1
-    print(float(count)/table.shape[0])              
+        if(i[0] == i[1]):
+            pq_count+=1
+    for i in table:
+        if(i[0] == i[2]):
+            pt_count+=1
+    for i in table:
+        if(i[1] == i[2]):
+            qt_count+=1
+    print("Name: "+rf)
+    print("PQ: "+str(float(pq_count)/table.shape[0]))   
+    print("PT: "+str(float(pt_count)/table.shape[0]))       
+    print("QT: "+str(float(qt_count)/table.shape[0]))  
+    print("")
+               
 def parse_files():
     for filename in datasets:
         for tech in ["sample","select"]:
@@ -269,7 +283,7 @@ def parse_files():
                         train_table = pickle.load(file)
                         val_table = pickle.load(file)
                         test_table = pickle.load(file)
-                    counter(test_table)
-create_files()
+                    counter(test_table, result_filename)
+#create_files()
 parse_files()
 #
