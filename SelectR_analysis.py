@@ -192,7 +192,7 @@ def test(test_data, input_x):
             pred_list.append(pred)
             s_pred_list.append(s_pred)
             targ_pred_list.append(targ_pred)
-            partial_pred_list.append(partial)
+            partial_pred_list.append(partial.long())
             
     pred = torch.cat(pred_list, dim=0)
     s_pred = torch.cat(s_pred_list,dim=0)
