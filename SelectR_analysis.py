@@ -171,7 +171,8 @@ def test(test_data, input_x):
     s_pred_list = []
     targ_pred_list = []
     with torch.no_grad():
-        for data, partial, target in test_data:
+        for batch_idx, (data, partial, target) in enumerate(test_loader):
+        #for data, partial, target in test_data:
             #data, target = data.to(device), target.to(device)
             data = torch.from_numpy(data)
             partial = torch.from_numpy(partial)
