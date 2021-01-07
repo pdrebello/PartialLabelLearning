@@ -272,7 +272,7 @@ def counter(table, rf):
     print("PQ: "+str(float(pq_count)/table.shape[0]))   
     print("PT: "+str(float(pt_count)/table.shape[0]))       
     print("QT: "+str(float(qt_count)/table.shape[0]))  
-    print("PQ match, PT: "+str(float(count)/table.shape[0]))  
+    print("PQ match, PT: "+str(float(count)/pq_count))  
     print("")
                
 def parse_files():
