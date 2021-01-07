@@ -43,8 +43,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device("cuda:1")
-print(device)
-print(torch.cuda.current_device())
+#print(device)
+#print(torch.cuda.current_device())
 
 vals = [[],[],[],[]]
 
@@ -173,7 +173,12 @@ def test(test_data, input_x):
     with torch.no_grad():
         for data, partial, target in test_data:
             #data, target = data.to(device), target.to(device)
-            #data, partial, target = data.to(device), partial.to(device), target.to(device)
+            data = torch.from_numpy(data)
+            partial = torch.from_numpy(partial)
+            target = torch.from_numpy(target)
+            
+            data, partial, target = data.to(device), partial.to(device), target.to(device)
+            #data = torch.
             output = p_net.forward(data)
             s_output = s_net.forward(data, partial, input_x)
             
@@ -188,6 +193,8 @@ def test(test_data, input_x):
     s_pred = torch.vstack(s_pred_list)
     targ_pred_list = torch.vstack(targ_pred_list)
     print(pred.shape)
+    print(s_pred.shape)
+    print(targ_pred.shape)
     return -1
 
 k = 10
@@ -212,8 +219,8 @@ for filename in datasets:
                 p_net = Prediction_Net(input_dim, output_dim)
                 s_net = Selection_Net(input_dim, output_dim, input_x)
                 
-                #p_net.to(device)
-                #s_net.to(device)
+                p_net.to(device)
+                s_net.to(device)
             
                 
                 #model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
