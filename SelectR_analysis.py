@@ -24,6 +24,7 @@ import sys
 from IPython.core.debugger import Pdb
 import random
 import csv
+import pickle
 import os
 
 n_epochs = 150
@@ -170,6 +171,7 @@ def test(test_data, input_x):
     pred_list = []
     s_pred_list = []
     targ_pred_list = []
+    partial_pred_list = []
     with torch.no_grad():
         for batch_idx, (data, partial, target) in enumerate(test_loader):
         #for data, partial, target in test_data:
@@ -190,22 +192,16 @@ def test(test_data, input_x):
             pred_list.append(pred)
             s_pred_list.append(s_pred)
             targ_pred_list.append(targ_pred)
+            partial_pred_list.append(partial)
             
-
-
-
-
-    print(targ_pred[0].shape)
-    print(len(targ_pred))
     pred = torch.cat(pred_list, dim=0)
     s_pred = torch.cat(s_pred_list,dim=0)
     targ_pred_list = torch.cat(targ_pred_list, dim=0)
+    partial_pred_list = torch.cat(partial_pred_list, dim=0)
     
-    print(pred.shape)
-    print(s_pred.shape)
-    print(targ_pred.shape)
-    print("\n")
-    return -1
+    res = torch.cat([pred, s_pred, targ_pred_list, partial_pred_list], dim = 1)
+    #print(res.shape)
+    return res
 
 k = 10
 
@@ -214,7 +210,7 @@ datasets = ['Soccer Player','lost','MSRCv2','BirdSong','Yahoo! News']
 
 for filename in datasets:
     for tech in ["sample","select"]:
-        for input_x in [False,True]:
+        for input_x in [True,False]:
             for fold_no in range(k):
               
                 train_dataset, val_dataset, test_dataset, input_dim, output_dim = loadTrainAnalysis(filename+".mat", fold_no, k)
@@ -233,20 +229,24 @@ for filename in datasets:
                 s_net.to(device)
             
                 
-                #model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
+                #model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
                 model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
                 
                 checkpoint = torch.load(model_filename)
                 p_net.load_state_dict(checkpoint['p_net_state_dict'])
                 s_net.load_state_dict(checkpoint['s_net_state_dict'])
                 
-                train_dic = test(train_dataset, input_x)
-                val_dic = test(val_dataset, input_x)
-                test_dic = test(test_dataset, input_x)
+                train_table = test(train_dataset, input_x)
+                val_table = test(val_dataset, input_x)
+                test_table = test(test_dataset, input_x)
                 
-    
-                #os.makedirs(os.path.dirname(result_filename), exist_ok=True)
-                #with open(result_filename,"w", newline='') as file:
+                result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
+                
+                os.makedirs(os.path.dirname(result_filename), exist_ok=True)
+                with open(result_filename,"wb") as file:
+                    pickle.dump(train_table, file)
+                    pickle.dump(val_table, file)
+                    pickle.dump(test_table, file)
                 #    file.write(str(train_acc)+"\n")
                 #    file.write(str(val_acc)+"\n")
                 #    file.write(str(test_acc)+"\n")
