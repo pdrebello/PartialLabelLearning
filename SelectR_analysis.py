@@ -254,7 +254,7 @@ def counter(table, rf):
     pq_count = 0
     pt_count = 0
     qt_count = 0
-    
+    count = 0
     for i in table:
         if(i[0] == i[1]):
             pq_count+=1
@@ -264,10 +264,15 @@ def counter(table, rf):
     for i in table:
         if(i[1] == i[2]):
             qt_count+=1
+    for i in table:
+        if(i[1] == i[0]):
+            if(i[0] == i[2])
+                count+=1
     print("Name: "+rf)
     print("PQ: "+str(float(pq_count)/table.shape[0]))   
     print("PT: "+str(float(pt_count)/table.shape[0]))       
     print("QT: "+str(float(qt_count)/table.shape[0]))  
+    print("PQ match, PT: "+str(float(count)/table.shape[0]))  
     print("")
                
 def parse_files():
