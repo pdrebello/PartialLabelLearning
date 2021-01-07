@@ -193,9 +193,11 @@ def test(test_data, input_x):
     pred = torch.cat(pred_list, dim=0)
     s_pred = torch.cat(s_pred_list,dim=0)
     targ_pred_list = torch.cat(targ_pred_list, dim=0)
+    
     print(pred.shape)
     print(s_pred.shape)
     print(targ_pred.shape)
+    print("\n")
     return -1
 
 k = 10
