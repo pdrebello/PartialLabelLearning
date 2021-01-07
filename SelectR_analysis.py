@@ -190,6 +190,13 @@ def test(test_data, input_x):
             pred_list.append(pred)
             s_pred_list.append(s_pred)
             targ_pred_list.append(targ_pred)
+            
+
+
+
+
+    print(targ_pred[0].shape)
+    print(len(targ_pred))
     pred = torch.cat(pred_list, dim=0)
     s_pred = torch.cat(s_pred_list,dim=0)
     targ_pred_list = torch.cat(targ_pred_list, dim=0)
