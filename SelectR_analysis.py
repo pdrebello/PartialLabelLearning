@@ -266,7 +266,7 @@ def counter(table, rf):
             qt_count+=1
     for i in table:
         if(i[1] == i[0]):
-            if(i[0] == i[2])
+            if(i[0] == i[2]):
                 count+=1
     print("Name: "+rf)
     print("PQ: "+str(float(pq_count)/table.shape[0]))   
