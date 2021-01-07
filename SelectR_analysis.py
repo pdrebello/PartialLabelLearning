@@ -46,7 +46,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device("cuda:1")
 #print(device)
 #print(torch.cuda.current_device())
-input_x = False
+
 vals = [[],[],[],[]]
 
 def cc_loss(output, target):
@@ -206,11 +206,12 @@ def test(test_loader, input_x, p_net, s_net):
 k = 10
 
 datasets = ['Soccer Player','lost','MSRCv2','BirdSong','Yahoo! News']
-
+input_x = False
 def create_files():
     for filename in datasets:
         for tech in ["sample","select"]:
             for a in [True,False]:
+                global input_x
                 input_x = a
                 for fold_no in range(k):
                     
@@ -259,6 +260,7 @@ def parse_files():
     for filename in datasets:
         for tech in ["sample","select"]:
             for a in [True,False]:
+                global input_x
                 input_x = a
                 for fold_no in range(k):
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
