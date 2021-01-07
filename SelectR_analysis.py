@@ -176,9 +176,9 @@ def test(test_loader, input_x, p_net, s_net):
         for batch_idx, (data, partial, target) in enumerate(test_loader):
         #for data, partial, target in test_data:
             #data, target = data.to(device), target.to(device)
-            data = torch.from_numpy(data)
-            partial = torch.from_numpy(partial)
-            target = torch.from_numpy(target)
+            #data = torch.from_numpy(data)
+            #partial = torch.from_numpy(partial)
+            #target = torch.from_numpy(target)
             
             data, partial, target = data.to(device), partial.to(device), target.to(device)
             #data = torch.
@@ -236,9 +236,9 @@ def create_files():
                     p_net.load_state_dict(checkpoint['p_net_state_dict'])
                     s_net.load_state_dict(checkpoint['s_net_state_dict'])
                     
-                    train_table = test(train_dataset, input_x, p_net, s_net)
-                    val_table = test(val_dataset, input_x, p_net, s_net)
-                    test_table = test(test_dataset, input_x, p_net, s_net)
+                    train_table = test(train_loader, input_x, p_net, s_net)
+                    val_table = test(val_loader, input_x, p_net, s_net)
+                    test_table = test(test_loader, input_x, p_net, s_net)
                     
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
                     
