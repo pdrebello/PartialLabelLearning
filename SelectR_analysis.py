@@ -40,6 +40,7 @@ torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda:1")
 print(device)
 print(torch.cuda.current_device())
 
