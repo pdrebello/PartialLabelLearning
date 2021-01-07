@@ -39,7 +39,8 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
-device = torch.device('cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 vals = [[],[],[],[]]
 
@@ -168,7 +169,7 @@ def test(test_data, input_x):
     with torch.no_grad():
         for data, partial, target in test_data:
             #data, target = data.to(device), target.to(device)
-            data, partial, target = data.to(device), partial.to(device), target.to(device)
+            #data, partial, target = data.to(device), partial.to(device), target.to(device)
             output = p_net.forward(data)
             s_output = s_net.forward(data, partial, input_x)
             
@@ -207,8 +208,8 @@ for filename in datasets:
                 p_net = Prediction_Net(input_dim, output_dim)
                 s_net = Selection_Net(input_dim, output_dim, input_x)
                 
-                p_net.to(device)
-                s_net.to(device)
+                #p_net.to(device)
+                #s_net.to(device)
             
                 
                 #model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
