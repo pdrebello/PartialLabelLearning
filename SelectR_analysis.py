@@ -176,9 +176,9 @@ def test(test_loader, input_x, p_net, s_net):
         for batch_idx, (data, partial, target) in enumerate(test_loader):
         #for data, partial, target in test_data:
             #data, target = data.to(device), target.to(device)
-            #data = torch.from_numpy(data)
-            #partial = torch.from_numpy(partial)
-            #target = torch.from_numpy(target)
+            data = torch.from_numpy(data)
+            partial = torch.from_numpy(partial)
+            target = torch.from_numpy(target)
             
             data, partial, target = data.to(device), partial.to(device), target.to(device)
             #data = torch.
