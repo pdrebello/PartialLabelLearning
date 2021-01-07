@@ -250,30 +250,36 @@ def create_files():
                         pickle.dump(val_table, file)
                         pickle.dump(test_table, file)
 
-def counter(table, rf):
+def counter(table, dic):
     pq_count = 0
     pt_count = 0
     qt_count = 0
     count = 0
+    
+    
+    
     for i in table:
-        if(i[0] == i[1]):
-            pq_count+=1
-    for i in table:
+        p = "0"
+        q = "0"
         if(i[0] == i[2]):
-            pt_count+=1
-    for i in table:
+            p = "1"
         if(i[1] == i[2]):
-            qt_count+=1
-    for i in table:
-        if(i[1] == i[0]):
+            q = "1"
+        dic[p+q]+=1
+        
+        if(i[0] == i[1]):
             if(i[0] == i[2]):
-                count+=1
-    print("Name: "+rf)
-    print("PQ: "+str(float(pq_count)/table.shape[0]))   
-    print("PT: "+str(float(pt_count)/table.shape[0]))       
-    print("QT: "+str(float(qt_count)/table.shape[0]))  
-    print("PQ match, PT: "+str(float(count)/pq_count))  
-    print("")
+                dic["pq_same_correct"]+=1
+            else:
+                dic["pq_same_wrong"]+=1
+        else:
+            if(i[0] == i[2]):
+                dic["pq_diff_correct"]+=1
+            else:
+                dic["pq_diff_wrong"]+=1
+        
+            
+    return dic
                
 def parse_files():
     for filename in datasets:
@@ -281,6 +287,9 @@ def parse_files():
             for a in [True,False]:
                 global input_x
                 input_x = a
+                
+                dic = {"00":0, "01":0, "10":0, "11":0, "pq_same_wrong":0,"pq_diff_wrong":0, "pq_same_correct":0,"pq_diff_correct":0}
+                
                 for fold_no in range(k):
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
                     
@@ -288,7 +297,25 @@ def parse_files():
                         train_table = pickle.load(file)
                         val_table = pickle.load(file)
                         test_table = pickle.load(file)
-                    counter(test_table, result_filename)
+                    counter(test_table, dic)
+                norm1 = float(dic["00"]+dic["01"]+dic["10"]+dic["11"])
+                dic["00"]/=norm1
+                dic["01"]/=norm1
+                dic["10"]/=norm1
+                dic["11"]/=norm1
+                norm2 = float(dic["pq_same_correct"]+dic["pq_same_wrong"])
+                dic["pq_same_correct"]/=norm2
+                dic["pq_same_wrong"]/=norm2
+                norm3 = float(dic["pq_diff_correct"]+dic["pq_diff_wrong"])
+                dic["pq_diff_correct"]/=norm3
+                dic["pq_diff_wrong"]/=norm3
+                
+                print(filename+"/SelectR_"+str(tech)+"_"+str(input_x))
+                for key,value in dic.items():
+                    if((key != "pq_diff_wrong") and (key != "pq_same_wrong")):
+                        print(key+": "+str(value))
+                print("")
+                
 #create_files()
 parse_files()
 #
