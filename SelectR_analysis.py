@@ -26,6 +26,7 @@ import random
 import csv
 import pickle
 import os
+import pandas as pd
 
 n_epochs = 150
 batch_size_train = 64
@@ -269,26 +270,36 @@ def counter(table, dic):
         
         if(i[0] == i[1]):
             if(i[0] == i[2]):
-                dic["pq_same_correct"]+=1
-            else:
-                dic["pq_same_wrong"]+=1
+                dic["p=q, p correct"]+=1
+                
+            if(i[1] == i[2]):
+                dic["p=q, q correct"]+=1
+                
+            dic["p=q"]+=1
         else:
             if(i[0] == i[2]):
-                dic["pq_diff_correct"]+=1
-            else:
-                dic["pq_diff_wrong"]+=1
+                dic["p!=q, p correct"]+=1
+                
+            if(i[1] == i[2]):
+                dic["p!=q, q correct"]+=1
+                
+            dic["p!=q"]+=1
         
             
     return dic
                
 def parse_files():
     for filename in datasets:
+        
+        file_dic = {}
+        
         for tech in ["sample","select"]:
             for a in [True,False]:
                 global input_x
                 input_x = a
                 
-                dic = {"00":0, "01":0, "10":0, "11":0, "pq_same_wrong":0,"pq_diff_wrong":0, "pq_same_correct":0,"pq_diff_correct":0}
+                dic = {"00":0, "01":0, "10":0, "11":0, "p=q, p correct":0,"p=q, q correct":0,"p=q":0,
+                       "p!=q, p correct":0,"p!=q, q correct":0,"p!=q":0}
                 
                 for fold_no in range(k):
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
@@ -303,18 +314,39 @@ def parse_files():
                 dic["01"]/=norm1
                 dic["10"]/=norm1
                 dic["11"]/=norm1
-                norm2 = float(dic["pq_same_correct"]+dic["pq_same_wrong"])
-                dic["pq_same_correct"]/=norm2
-                dic["pq_same_wrong"]/=norm2
-                norm3 = float(dic["pq_diff_correct"]+dic["pq_diff_wrong"])
-                dic["pq_diff_correct"]/=norm3
-                dic["pq_diff_wrong"]/=norm3
+                #norm2 = float(dic["pq_same_correct"]+dic["pq_same_wrong"])
+                dic["p=q, p correct"]/=dic["p=q"]
+                dic["p=q, p correct"]/=dic["p=q"]
+                #norm3 = float(dic["pq_diff_correct"]+dic["pq_diff_wrong"])
+                dic["p!=q, p correct"]/=dic["p!=q"]
+                dic["p!=q, p correct"]/=dic["p!=q"]
                 
-                print(filename+"/SelectR_"+str(tech)+"_"+str(input_x))
-                for key,value in dic.items():
-                    if((key != "pq_diff_wrong") and (key != "pq_same_wrong")):
-                        print(key+": "+str(value))
-                print("")
+                if(input_x):
+                    name = str(tech)+"_"+"X inputted to Phi Net"
+                else:
+                    name = str(tech)
+                
+                #print(filename+"/SelectR_"+str(tech)+"_"+str(input_x))
+                li = []
+                li.append(dic["00"]*100)
+                li.append(dic["01"]*100)
+                li.append(dic["10"]*100)
+                li.append(dic["11"]*100)
+                li.append(dic["p=q, p correct"]*100)
+                li.append(dic["p=q, p correct"]*100)
+                li.append(dic["p!=q, p correct"]*100)
+                li.append(dic["p!=q, p correct"]*100)
+                
+                file_dic[name] = li
+        df = pd.DataFrame(data = file_dic, index = {"00","01","10","11","p=q, p correct","p=q, p correct",
+                                                        "p!=q, p correct","p!=q, p correct"})
+        
+        rf = "results/RL_analysis/"+filename+".csv"
+        df.to_csv(rf)
+                #for key,value in dic.items():
+                #    if((key != "p=q") and (key != "p!=q")):
+                #        print(key+": "+str(value))
+                #print("")
                 
 #create_files()
 parse_files()
