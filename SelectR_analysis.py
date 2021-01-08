@@ -41,7 +41,7 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1" 
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1" 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device("cuda:1")
@@ -183,6 +183,7 @@ def test(test_loader, input_x, p_net, s_net):
             
             data, partial, target = data.to(device), partial.to(device), target.to(device)
             #data = torch.
+            partial = torch.ones_like(partial)
             output = p_net.forward(data)
             s_output = s_net.forward(data, partial, input_x)
             
@@ -244,7 +245,7 @@ def create_files():
                     test_table = test(test_loader, input_x, p_net, s_net)
                     
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
-                    
+                    print(result_filename) 
                     os.makedirs(os.path.dirname(result_filename), exist_ok=True)
                     with open(result_filename,"wb") as file:
                         pickle.dump(train_table, file)
@@ -303,7 +304,7 @@ def parse_files():
                 
                 for fold_no in range(k):
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
-                    
+                    print(result_filename)
                     with open(result_filename,"rb") as file:
                         train_table = pickle.load(file)
                         val_table = pickle.load(file)
@@ -336,10 +337,11 @@ def parse_files():
                 li.append(dic["p=q, q correct"]*100)
                 li.append(dic["p!=q, p correct"]*100)
                 li.append(dic["p!=q, q correct"]*100)
-                
+                li.append(dic["p=q"])
+                li.append(dic["p!=q"])
                 file_dic[name] = li
         df = pd.DataFrame(data = file_dic, index = ["00","01","10","11","p=q, p correct","p=q, q correct",
-                                                        "p!=q, p correct","p!=q, q correct"])
+                                                        "p!=q, p correct","p!=q, q correct","p=q","p!=q"])
         
         rf = "results/RL_analysis/tables/"+filename+".csv"
         df.to_csv(rf)
@@ -349,5 +351,9 @@ def parse_files():
                 #print("")
                 
 #create_files()
+print(torch.cuda.current_device())
+#print(torch.cuda.memory_snapshot())
+#create_files()
 parse_files()
+
 #
