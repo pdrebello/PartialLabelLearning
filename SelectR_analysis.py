@@ -187,13 +187,13 @@ def test(test_loader, input_x, p_net, s_net):
             output = p_net.forward(data)
             s_output = s_net.forward(data, partial, input_x)
             
-            pred = output.data.max(1, keepdim=True)[1]
-            s_pred = s_output.data.max(1, keepdim=True)[1]
-            targ_pred = target.data.max(1, keepdim=True)[1]
+            #pred = output.data.max(1, keepdim=True)[1]
+            #s_pred = s_output.data.max(1, keepdim=True)[1]
+            #targ_pred = target.data.max(1, keepdim=True)[1]
             
-            pred_list.append(pred)
-            s_pred_list.append(s_pred)
-            targ_pred_list.append(targ_pred)
+            pred_list.append(output)
+            s_pred_list.append(s_output)
+            targ_pred_list.append(target.long())
             partial_pred_list.append(partial.long())
             
     pred = torch.cat(pred_list, dim=0)
@@ -201,7 +201,7 @@ def test(test_loader, input_x, p_net, s_net):
     targ_pred_list = torch.cat(targ_pred_list, dim=0)
     partial_pred_list = torch.cat(partial_pred_list, dim=0)
     
-    res = torch.cat([pred, s_pred, targ_pred_list, partial_pred_list], dim = 1)
+    res = torch.stack([pred.cpu(), s_pred.cpu(), targ_pred_list.cpu(), partial_pred_list.cpu()])
     #print(res.shape)
     return res
 
@@ -233,8 +233,8 @@ def create_files():
                     s_net.to(device)
                 
                     
-                    #model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
-                    model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
+                    model_filename = "results/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
+                    #model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
                     
                     checkpoint = torch.load(model_filename)
                     p_net.load_state_dict(checkpoint['p_net_state_dict'])
@@ -253,35 +253,39 @@ def create_files():
                         pickle.dump(test_table, file)
 
 def counter(table, dic):
-    pq_count = 0
-    pt_count = 0
-    qt_count = 0
-    count = 0
+    p = table[0]
+    q = table[1]
+    t = table[2]
+    partials = table[3]
     
-    
-    
-    for i in table:
-        p = "0"
-        q = "0"
-        if(i[0] == i[2]):
-            p = "1"
-        if(i[1] == i[2]):
-            q = "1"
-        dic[p+q]+=1
+    for index in p.shape[0]:
+        p_string = "0"
+        q_string = "0"
         
-        if(i[0] == i[1]):
-            if(i[0] == i[2]):
+        dic["total"]+=1
+        
+        if(p[index].argmax() == t[index].argmax()):
+            p_string = "1"
+        if(q[index].argmax() == t[index].argmax()):
+            q_string = "1"
+        if((p[index]+q[index]).argmax() == t[index].argmax()): 
+            dic["avg"]+=1
+        dic[p_string+q_string]+=1
+    
+        
+        if(p[index].argmax() == q[index].argmax()):
+            if(p[index].argmax() == t[index].argmax()):
                 dic["p=q, p correct"]+=1
                 
-            if(i[1] == i[2]):
+            if(q[index].argmax() == t[index].argmax()):
                 dic["p=q, q correct"]+=1
                 
             dic["p=q"]+=1
         else:
-            if(i[0] == i[2]):
+            if(p[index].argmax() == t[index].argmax()):
                 dic["p!=q, p correct"]+=1
                 
-            if(i[1] == i[2]):
+            if(q[index].argmax() == t[index].argmax()):
                 dic["p!=q, q correct"]+=1
                 
             dic["p!=q"]+=1
@@ -290,6 +294,8 @@ def counter(table, dic):
     return dic
                
 def parse_files():
+    writer = pd.ExcelWriter("results/RL_analysis/tables.xlsx", engine='xlsxwriter')
+
     for filename in datasets:
         
         file_dic = {}
@@ -300,7 +306,7 @@ def parse_files():
                 input_x = a
                 
                 dic = {"00":0, "01":0, "10":0, "11":0, "p=q, p correct":0,"p=q, q correct":0,"p=q":0,
-                       "p!=q, p correct":0,"p!=q, q correct":0,"p!=q":0}
+                       "p!=q, p correct":0,"p!=q, q correct":0,"p!=q":0, "total":0, "avg":0}
                 
                 for fold_no in range(k):
                     result_filename = "results/RL_analysis/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/"+str(fold_no)+".pkl"
@@ -311,16 +317,56 @@ def parse_files():
                         test_table = pickle.load(file)
                     counter(test_table, dic)
                 norm1 = float(dic["00"]+dic["01"]+dic["10"]+dic["11"])
-                dic["00"]/=norm1
-                dic["01"]/=norm1
-                dic["10"]/=norm1
-                dic["11"]/=norm1
+                print(str(norm1)+" "+str(dic["total"]))
+                index = []
+                li = []
+                
+                index.append("total")
+                li.append(dic["total"])
+                
+                index.append("p accuracy")
+                li.append((dic["10"]+dic["11"])*100.0/dic["total"])
+                
+                index.append("q accuracy")
+                li.append((dic["01"]+dic["11"])*100.0/dic["total"])
+                
+                index.append("avg accuracy")
+                li.append((dic["avg"])*100.0/dic["total"])
+                
+                index.append("00")
+                li.append(dic["00"]*100.0/dic["total"])
+                index.append("01")
+                li.append(dic["01"]*100.0/dic["total"])
+                index.append("10")
+                li.append(dic["10"]*100.0/dic["total"])
+                index.append("11")
+                li.append(dic["11"]*100.0/dic["total"])
+                
+                
+                index.append("p=q")
+                li.append(dic["p=q"])
+                index.append("p!=q")
+                li.append(dic["p!=q"])
+                
+                index.append("p=q, p correct")
+                li.append(dic["p=q, p correct"]*100.0/dic["p=q"])
+                index.append("p=q, q correct")
+                li.append(dic["p=q, q correct"]*100.0/dic["p=q"])
+                index.append("p!=q, p correct")
+                li.append(dic["p!=q, p correct"]*100.0/dic["p!=q"])
+                index.append("p!=q, q correct")
+                li.append(dic["p!=q, q correct"]*100.0/dic["p!=q"])
+                
+                #dic["00"]/=norm1
+                #dic["01"]/=norm1
+                #dic["10"]/=norm1
+                #dic["11"]/=norm1
                 #norm2 = float(dic["pq_same_correct"]+dic["pq_same_wrong"])
-                dic["p=q, p correct"]/=dic["p=q"]
-                dic["p=q, q correct"]/=dic["p=q"]
+                #dic["p=q, p correct"]/=dic["p=q"]
+                #dic["p=q, q correct"]/=dic["p=q"]
                 #norm3 = float(dic["pq_diff_correct"]+dic["pq_diff_wrong"])
-                dic["p!=q, p correct"]/=dic["p!=q"]
-                dic["p!=q, q correct"]/=dic["p!=q"]
+                #dic["p!=q, p correct"]/=dic["p!=q"]
+                #dic["p!=q, q correct"]/=dic["p!=q"]
                 
                 if(input_x):
                     name = str(tech)+"_"+"X inputted to Phi Net"
@@ -328,32 +374,32 @@ def parse_files():
                     name = str(tech)
                 
                 #print(filename+"/SelectR_"+str(tech)+"_"+str(input_x))
-                li = []
-                li.append(dic["00"]*100)
-                li.append(dic["01"]*100)
-                li.append(dic["10"]*100)
-                li.append(dic["11"]*100)
-                li.append(dic["p=q, p correct"]*100)
-                li.append(dic["p=q, q correct"]*100)
-                li.append(dic["p!=q, p correct"]*100)
-                li.append(dic["p!=q, q correct"]*100)
-                li.append(dic["p=q"])
-                li.append(dic["p!=q"])
+                
+                #li.append(dic["00"]*100)
+                #li.append(dic["01"]*100)
+                #li.append(dic["10"]*100)
+                #li.append(dic["11"]*100)
+                #li.append(dic["p=q, p correct"]*100)
+                #li.append(dic["p=q, q correct"]*100)
+                #li.append(dic["p!=q, p correct"]*100)
+                #li.append(dic["p!=q, q correct"]*100)
+                #li.append(dic["p=q"])
+                #li.append(dic["p!=q"])
                 file_dic[name] = li
-        df = pd.DataFrame(data = file_dic, index = ["00","01","10","11","p=q, p correct","p=q, q correct",
-                                                        "p!=q, p correct","p!=q, q correct","p=q","p!=q"])
+        df = pd.DataFrame(data = file_dic, index = index)
         
-        rf = "results/RL_analysis/tables/"+filename+".csv"
-        df.to_csv(rf)
+        #rf = "results/RL_analysis/tables/"+filename+".csv"
+        #df.to_csv(rf)
+        df.to_excel(writer, sheet_name=filename)
                 #for key,value in dic.items():
                 #    if((key != "p=q") and (key != "p!=q")):
                 #        print(key+": "+str(value))
                 #print("")
-                
+    writer.save()
 #create_files()
-print(torch.cuda.current_device())
+#print(torch.cuda.current_device())
 #print(torch.cuda.memory_snapshot())
-#create_files()
+create_files()
 parse_files()
 
 #
