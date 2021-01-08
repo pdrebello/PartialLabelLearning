@@ -300,9 +300,9 @@ for filename in datasets:
             
             
                 best_val = 0
-                result_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/results/"+str(fold_no)+"_out.txt"
-                result_log_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/logs/"+str(fold_no)+"_log.csv"
-                model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
+                result_filename = "results/09012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/results/"+str(fold_no)+"_out.txt"
+                result_log_filename = "results/09012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/logs/"+str(fold_no)+"_log.csv"
+                model_filename = "results/09012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_best.pth"
                 
                 
                 
@@ -338,7 +338,7 @@ for filename in datasets:
                       os.makedirs(os.path.dirname(model_filename), exist_ok=True)
                       torch.save(checkpoint, model_filename)
                   if((epoch%10==0) and (epoch>0)):
-                      e_model_filename = "results/05012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
+                      e_model_filename = "results/09012020/"+filename+"/SelectR_"+str(tech)+"_"+str(input_x)+"/models/"+str(fold_no)+"_"+str(epoch)+".pth"
                       os.makedirs(os.path.dirname(e_model_filename), exist_ok=True)
                       torch.save(checkpoint, e_model_filename)
                 
