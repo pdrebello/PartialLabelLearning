@@ -171,7 +171,7 @@ for filename in datasets:
         n_epochs = 1000
     else:
         n_epochs = 150
-    n_epochs = 2
+    #n_epochs = 2
     train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
     
     train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -183,9 +183,9 @@ for filename in datasets:
     
     real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
       batch_size=batch_size_train, shuffle=True)
-    real_test_loader = torch.utils.data.DataLoader(test_dataset,
+    real_test_loader = torch.utils.data.DataLoader(real_test_dataset,
       batch_size=batch_size_test, shuffle=True)
-    real_val_loader = torch.utils.data.DataLoader(val_dataset,
+    real_val_loader = torch.utils.data.DataLoader(real_val_dataset,
       batch_size=batch_size_test, shuffle=True)
     
     logs = []
