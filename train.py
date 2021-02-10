@@ -195,6 +195,7 @@ for filename in datasets:
     logs = []
     
     if((technique == "cc_loss") or (technique == "min_loss") or (technique == "naive_loss") or (technique == "iexplr_loss") or (technique == 'regularized_cc_loss')):
+        dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
         if(technique == "cc_loss"):
             loss_function = cc_loss
         elif(technique == "min_loss"):
@@ -206,6 +207,7 @@ for filename in datasets:
         elif(technique == "regularized_cc_loss"):
             lambd = argument.lambd
             loss_function = lambda x, y : regularized_cc_loss(lambd, x, y)
+            dataset_technique_path = os.path.join(filename, model, technique+"_"+str(lambd), str(fold_no))
             
         
         if(model == "1layer"):
@@ -216,7 +218,7 @@ for filename in datasets:
         p_net.to(device)
         p_optimizer = torch.optim.Adam(p_net.parameters())
         
-        dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
+        
         
         result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
         result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
