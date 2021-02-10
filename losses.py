@@ -14,7 +14,7 @@ def cc_loss(output, target):
     
     batch_size = output.shape[0]
     loss = torch.bmm(output.view(output.shape[0], 1, output.shape[1]), target.view(output.shape[0], output.shape[1], 1))
-    loss = torch.log(loss)
+    loss = torch.log(loss+epsilon)
     loss = torch.sum(loss)
     loss = torch.div(loss, -batch_size)
     return loss
@@ -34,7 +34,7 @@ def min_loss(output, target):
     batch_size = output.shape[0]
     loss = output * target
     loss = torch.max(loss, dim = 1).values
-    loss = torch.log(loss)
+    loss = torch.log(loss+epsilon)
     loss = torch.sum(loss)
     loss = torch.div(loss, -batch_size)
     return loss
@@ -42,7 +42,6 @@ def min_loss(output, target):
 def regularized_cc_loss(lambd, output, target):
     c = cc_loss(output, target)
     m = min_loss(output, target)
-    #Pdb().set_trace()
     return  c + lambd*m
 
 def naive_reward(output, target):
