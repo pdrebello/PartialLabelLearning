@@ -183,9 +183,9 @@ for filename in datasets:
     
     real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
       batch_size=batch_size_train, shuffle=True)
-    real_test_loader = torch.utils.data.DataLoader(test_dataset,
+    real_test_loader = torch.utils.data.DataLoader(real_test_dataset,
       batch_size=batch_size_test, shuffle=True)
-    real_val_loader = torch.utils.data.DataLoader(val_dataset,
+    real_val_loader = torch.utils.data.DataLoader(real_val_dataset,
       batch_size=batch_size_test, shuffle=True)
     
     logs = []
@@ -222,7 +222,6 @@ for filename in datasets:
             real_train_acc = p_accuracy(real_train_loader, p_net)
             surrogate_val_acc = p_accuracy(val_loader, p_net)
             real_val_acc = p_accuracy(real_val_loader, p_net)
-            
             
             log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
                        'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
