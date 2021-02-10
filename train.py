@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 import scipy.io
 from dataset import Dataset, loadTrain, loadTrainT
-from losses import cc_loss, min_loss, naive_loss, iexplr_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
 from IPython.core.debugger import Pdb
@@ -14,6 +14,7 @@ import csv
 import os
 import json
 import argparse
+import numpy as np
 
 parser = argparse.ArgumentParser(description = "Description for my parser")
 
@@ -24,6 +25,7 @@ parser.add_argument('--dump_dir', type=str, help="dump directory for results")
 parser.add_argument('--technique', type=str, help="training procedure")
 parser.add_argument('--model', type=str, help="Use a 1 layer model for prediction?")
 parser.add_argument('--pretrain_stategy', type=str, help="If RL, how to pretrain?")
+parser.add_argument('--lambd', type=float, help="regularization cc_loss hyperparameter")
 
 argument = parser.parse_args()
    
@@ -36,12 +38,14 @@ log_interval = 10
 
 epsilon = 1e-6
 
+#Reproducibility
 random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
+np.random.seed(random_seed)
+random.seed(random_seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 def train(epoch, loss_function, p_net, p_optimizer):
     p_net.train()
@@ -190,7 +194,7 @@ for filename in datasets:
     
     logs = []
     
-    if((technique == "cc_loss") or (technique == "min_loss") or (technique == "naive_loss") or (technique == "iexplr_loss")):
+    if((technique == "cc_loss") or (technique == "min_loss") or (technique == "naive_loss") or (technique == "iexplr_loss") or (technique == 'regularized_cc_loss')):
         if(technique == "cc_loss"):
             loss_function = cc_loss
         elif(technique == "min_loss"):
@@ -199,6 +203,10 @@ for filename in datasets:
             loss_function = naive_loss
         elif(technique == "iexplr_loss"):
             loss_function = iexplr_loss
+        elif(technique == "regularized_cc_loss"):
+            lambd = argument.lambd
+            loss_function = lambda x, y : regularized_cc_loss(lambd, x, y)
+            
         
         if(model == "1layer"):
             p_net = Prediction_Net_Linear(input_dim, output_dim)
@@ -247,7 +255,7 @@ for filename in datasets:
         real_test_acc = p_accuracy(real_test_loader, p_net)
         
         
-        log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'train', 
+        log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'test', 
                        'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
                        'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
                        'surrogate_test_acc': surrogate_test_acc, 'real_test_acc': real_test_acc, 

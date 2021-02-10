@@ -1,4 +1,5 @@
 import torch
+from IPython.core.debugger import Pdb
 
 epsilon = 1e-6
 
@@ -37,6 +38,12 @@ def min_loss(output, target):
     loss = torch.sum(loss)
     loss = torch.div(loss, -batch_size)
     return loss
+
+def regularized_cc_loss(lambd, output, target):
+    c = cc_loss(output, target)
+    m = min_loss(output, target)
+    #Pdb().set_trace()
+    return  c + lambd*m
 
 def naive_reward(output, target):
     batch_size = output.shape[0]
