@@ -259,6 +259,59 @@ def loadTrainAnalysis(filename, fold_no, k):
     #return train_data, test_data
     return train_dataset, val_dataset, test_dataset, data.shape[1], partials.shape[1]
 
+def loadTrainValHelp(filename, fold_no, k):
+    with open("datasets/"+filename+".pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+
+    split = int(data.shape[0]/k)
+
+    train_data_list = []
+    train_target_list = []
+    train_partials_list = []
+
+    test_data_list = []
+    test_target_list = []
+    test_partials_list = []
+
+    val_data_list = []
+    val_target_list = []
+    val_partials_list = []
+
+    for i in range(k):
+        if(fold_no == i):
+            test_data_list.append(data[i*split : (i+1)*split])
+            test_target_list.append(target[i*split : (i+1)*split])
+            test_partials_list.append(partials[i*split : (i+1)*split])
+        elif(i == (fold_no+1)%k):
+            val_data_list.append(data[i*split : (i+1)*split])
+            val_target_list.append(target[i*split : (i+1)*split])
+            val_partials_list.append(partials[i*split : (i+1)*split])
+        else:
+            train_data_list.append(data[i*split : (i+1)*split])
+            train_target_list.append(target[i*split : (i+1)*split])
+            train_partials_list.append(partials[i*split : (i+1)*split])
+
+    train_data = np.vstack(train_data_list)
+    train_target = np.vstack(train_target_list)
+    train_partials = np.vstack(train_partials_list)
+
+    test_data = np.vstack(test_data_list)
+    test_target = np.vstack(test_target_list)
+    test_partials = np.vstack(test_partials_list)
+
+    val_data = np.vstack(val_data_list)
+    val_target = np.vstack(val_target_list)
+    val_partials = np.vstack(val_partials_list)
+
+    train_dataset = Dataset(train_data, train_partials)
+    test_dataset = Dataset(test_data, test_target)
+    #real_val_dataset = Dataset(val_data, val_target)
+    real_train_dataset = Dataset(train_data, train_target)
+    val_dataset = Dataset(val_data, val_partials)
+    #return train_data, test_data
+    return train_dataset, test_dataset, real_train_dataset, val_dataset, data.shape[1], partials.shape[1]
 #a = loadTrain('MSRCv2.mat',4,10)
 #tr = list(a[0])
 #te = list(a[1])
