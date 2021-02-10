@@ -223,7 +223,6 @@ for filename in datasets:
             surrogate_val_acc = p_accuracy(val_loader, p_net)
             real_val_acc = p_accuracy(real_val_loader, p_net)
             
-            
             log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
                        'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
                        'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
