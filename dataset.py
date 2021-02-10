@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov 23 11:22:12 2020
-
-@author: pratheek
-"""
-
-
 import scipy.io
 import torch
 import numpy as np
@@ -143,8 +134,6 @@ def loadTrainT(filename):
 
 def loadTrain(filename, fold_no, k):  
     
-    
-    
     with open("datasets/"+filename+".pkl", "rb") as f:
         data = pickle.load(f)
         partials = pickle.load(f)
@@ -191,11 +180,14 @@ def loadTrain(filename, fold_no, k):
     val_partials = np.vstack(val_partials_list)
     
     train_dataset = Dataset(train_data, train_partials)
-    test_dataset = Dataset(test_data, test_target)
-    val_dataset = Dataset(val_data, val_target)
+    test_dataset = Dataset(test_data, test_partials)
+    val_dataset = Dataset(val_data, val_partials)
     real_train_dataset = Dataset(train_data, train_target)
+    real_test_dataset = Dataset(test_data, test_target)
+    real_val_dataset = Dataset(val_data, val_target)
+    
     #return train_data, test_data
-    return train_dataset, test_dataset, real_train_dataset, val_dataset, data.shape[1], partials.shape[1]
+    return train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, data.shape[1], partials.shape[1]
 
 
 def loadTrainAnalysis(filename, fold_no, k):  
@@ -253,30 +245,5 @@ def loadTrainAnalysis(filename, fold_no, k):
     train_dataset = DatasetAnalysis(dic["train_data"], dic["train_partials"], dic["train_target"])
     val_dataset = DatasetAnalysis(dic["val_data"], dic["val_partials"], dic["val_target"])
     test_dataset = DatasetAnalysis(dic["test_data"], dic["test_partials"], dic["test_target"])
-    #real_train_dataset = Dataset(train_data, train_target)
-    #real_test_dataset = Dataset(test_data, test_target)
-    #real_val_dataset = Dataset(val_data, val_target)
-    #return train_data, test_data
+    
     return train_dataset, val_dataset, test_dataset, data.shape[1], partials.shape[1]
-
-#a = loadTrain('MSRCv2.mat',4,10)
-#tr = list(a[0])
-#te = list(a[1])
-
-#for count,i in enumerate(tr):
-#    for j in range(count+1, len(tr)):
-#        if((tr[count] == tr[j]).all()):
-#            print(j)
-    #print(i.shape)
-    #print(te[0].shape)
-#for i in tr:
-    #print(type(i))
-    #print(type(te[0]))
-#    if((te[0] == i).all()):
-#        print(te[0])
-#        print(i)
-
-#datasets = ['MSRCv2','Yahoo! News','lost','Soccer Player','BirdSong']
-#for i in datasets:
-#    prepTrain(i+".mat")
-#a = loadTrain("lost.mat")
