@@ -181,7 +181,7 @@ pretrain_q = True if argument.pretrain_q == 1 else False
 k = 10
 
 pretrain_p_epochs = 3
-pretrain_q_epochs = 3
+pretrain_q_epochs = 50
 
 for filename in datasets:
     if(filename in ['lost','MSRCv2','BirdSong']):
