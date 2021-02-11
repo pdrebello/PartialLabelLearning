@@ -305,9 +305,8 @@ for filename in datasets:
             overall_strategy += "_Q"
         dataset_technique_path = os.path.join(filename, model, overall_strategy, str(fold_no))
         
-        result_filename = os.path.join(dump_dir, dataset_technique_path, "results", str(fold_no)+"_out.txt")
-        result_log_filename = os.path.join(dump_dir, dataset_technique_path, "logs", str(fold_no)+"_log.csv")
-        result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", str(fold_no)+"_log.json")
+        result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
+        result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
         
         logs = []
         
