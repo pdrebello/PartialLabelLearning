@@ -27,6 +27,9 @@ parser.add_argument('--model', type=str, help="Use a 1 layer model for predictio
 parser.add_argument('--pretrain_stategy', type=str, help="If RL, how to pretrain?")
 parser.add_argument('--lambd', type=float, help="regularization cc_loss hyperparameter")
 
+parser.add_argument('--pretrain_p', type=int, help="Pretrain P network")
+parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
+
 argument = parser.parse_args()
    
 
@@ -80,7 +83,7 @@ def rl_train(epoch, rl_technique, p_net, p_optimizer, s_net, s_optimizer):
         p = p_net(data)
         q = s_net(data, target, rl_technique)
         
-        if(rl_technique == 'sample'):
+        if(rl_technique == 'exponential_rl'):
             if(torch.isnan(q.sum())):
                 Pdb().set_trace()
             with torch.no_grad():
@@ -160,15 +163,25 @@ def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, file
 
 dump_dir = argument.dump_dir
 filename = argument.dataset
+
 datasets = argument.datasets
 datasets = [str(item) for item in datasets.split(',')]
 fold_no = argument.fold_no
+
 technique = argument.technique
+
 model = argument.model
 if(model is None):
     model = '3layer'
+
+pretrain_p = False if argument.pretrain_p == 0 else True
+pretrain_q = False if argument.pretrain_q == 0 else True
+
+
 k = 10
 
+pretrain_p_epochs = 3
+pretrain_q_epochs = 3
 
 for filename in datasets:
     if(filename in ['lost','MSRCv2','BirdSong']):
@@ -272,105 +285,186 @@ for filename in datasets:
             for log in logs:
                 json.dump(log, file)
                 file.write("\n")
-    """    
+        
     elif((technique == "linear_rl") or (technique == "exponential_rl")):    
+        loss_function = cc_loss
         
-        p_net_mlp = Prediction_Net(input_dim, output_dim)
+        if(model == "1layer"):
+            p_net = Prediction_Net_Linear(input_dim, output_dim)
+        else:
+            p_net = Prediction_Net(input_dim, output_dim)   
+        p_net.to(device)
+        p_optimizer = torch.optim.Adam(p_net.parameters())
         s_net = Selection_Net(input_dim, output_dim, True)
-        
-        
-        p_net_mlp.to(device)
         s_net.to(device)
         
-        p_optimizer_linear = torch.optim.Adam(p_net_linear.parameters())
-        p_optimizer_mlp = torch.optim.Adam(p_net_mlp.parameters())
-        s_optimizer = torch.optim.Adam(s_net.parameters())
-    
-        best_val = 0
-        best_val_epoch = -1
-    
-        dataset_technique_path = os.path.join(filename, model, technique, pretrain_stategy, str(fold_no))
-        
+        overall_strategy = technique
+        if(pretrain_p):
+            overall_strategy += "_P"
+        if(pretrain_q):
+            overall_strategy += "_Q"
+        dataset_technique_path = os.path.join(filename, model, overall_strategy, str(fold_no))
         
         result_filename = os.path.join(dump_dir, dataset_technique_path, "results", str(fold_no)+"_out.txt")
         result_log_filename = os.path.join(dump_dir, dataset_technique_path, "logs", str(fold_no)+"_log.csv")
         result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", str(fold_no)+"_log.json")
         
-        p_linear_pre_train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "p_linear_pre_train", str(fold_no)+".pth")
-        q_pre_train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "q_pre_train", str(fold_no)+".pth")
-        p_mlp_pre_train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "p_mlp_pre_train", str(fold_no)+".pth")
-        train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train", str(fold_no)+".pth") 
-    
         logs = []
         
-        if((pretrain == 'PQ') or (pretrain_strategy == "Q")):
+        #Pretraining of P Network
+        if(pretrain_p):
+            train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_p.pth") 
+            for epoch in range(1,pretrain_p_epochs+1):
+                train(epoch, loss_function, p_net, p_optimizer)
+                surrogate_train_acc = p_accuracy(train_loader, p_net)
+                real_train_acc = p_accuracy(real_train_loader, p_net)
+                surrogate_val_acc = p_accuracy(val_loader, p_net)
+                real_val_acc = p_accuracy(real_val_loader, p_net)
+                
+                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'pretrain_p', 
+                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_test_acc': None, 'real_test_acc': None, 
+                           'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
+                           'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
+                           'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                           'info': dataset_technique_path}
+                logs.append(log)
+            save_checkpoint(pretrain_p_epochs, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
+        
+        #Pretraining of Q Network
+        if(pretrain_q):
             p_net_linear = Prediction_Net_Linear(input_dim, output_dim)
             s_net.p_net = Prediction_Net_Linear(input_dim, output_dim)
             
+            p_optimizer_linear = torch.optim.Adam(p_net_linear.parameters())
+            s_optimizer = torch.optim.Adam(s_net.parameters())
+            
             p_net_linear.to(device)
-            for epoch in range(1,p_pretrain_epochs+1):
-                train_acc = pre_train(epoch, p_net_linear, p_optimizer_linear)
-                val = test(val_loader, p_net_linear)
+            s_net.to(device)   
+            
+            train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_p_linear.pth") 
+            for epoch in range(1,pretrain_p_epochs+1):
+                train(epoch, loss_function, p_net_linear, p_optimizer_linear)
+                surrogate_train_acc = p_accuracy(train_loader, p_net_linear)
+                real_train_acc = p_accuracy(real_train_loader, p_net_linear)
+                surrogate_val_acc = p_accuracy(val_loader, p_net_linear)
+                real_val_acc = p_accuracy(real_val_loader, p_net_linear)
                 
-                log = {'epoch':epoch, 'phase': 'p_linear_pre_train', 'train_acc': train_acc, 'val_acc': val}
+                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'pretrain_p_linear', 
+                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_test_acc': None, 'real_test_acc': None, 
+                           'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
+                           'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
+                           'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                           'info': dataset_technique_path}
                 logs.append(log)
-                
-                
-            save_checkpoint(p_pretrain_epochs, val, p_net_linear, p_optimizer_linear, s_net, s_optimizer, p_linear_pre_train_checkpoint)
+            save_checkpoint(pretrain_p_epochs, surrogate_val_acc, p_net_linear, p_optimizer_linear, None, None, train_checkpoint)
     
+            
             for param in s_net.p_net.parameters():
                 param.requires_grad = False
-            s_net.to(device)   
-            for epoch in range(1,q_pretrain_epochs+1):
-                train_acc = train(epoch, tech, p_net_linear, p_optimizer_linear, s_net, s_optimizer)
-                val = test(val_loader, p_net_linear)
-                q_val = q_test(val_loader, s_net, tech)
+            
+            train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_q.pth") 
+            for epoch in range(1,pretrain_q_epochs+1):
+                rl_train(epoch, technique, p_net_linear, p_optimizer_linear, s_net, s_optimizer)
+                surrogate_train_acc = p_accuracy(train_loader, p_net_linear)
+                real_train_acc = p_accuracy(real_train_loader, p_net_linear)
+                surrogate_val_acc = p_accuracy(val_loader, p_net_linear)
+                real_val_acc = p_accuracy(real_val_loader, p_net_linear)
                 
-                log = {'epoch':epoch, 'phase': 'q_pre_train', 'train_acc': train_acc, 'val_acc': val, 'q_val_acc':q_val}
+                q_surrogate_train_acc = q_accuracy(train_loader, s_net, technique)
+                q_real_train_acc = q_accuracy(real_train_loader, s_net, technique)
+                q_surrogate_val_acc = q_accuracy(val_loader, s_net, technique)
+                q_real_val_acc = q_accuracy(real_val_loader, s_net, technique)
+                
+                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'pretrain_q', 
+                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_test_acc': None, 'real_test_acc': None, 
+                           'q_surrogate_train_acc': q_surrogate_train_acc, 'q_real_train_acc': q_real_train_acc, 
+                           'q_surrogate_val_acc': q_surrogate_val_acc, 'q_real_val_acc': q_real_val_acc, 
+                           'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                           'info': dataset_technique_path}
                 logs.append(log)
-                
-                
-            save_checkpoint(q_pretrain_epochs, val, p_net_linear, p_optimizer_linear, s_net, s_optimizer, q_pre_train_checkpoint)
-    
+            save_checkpoint(pretrain_q_epochs, surrogate_val_acc, p_net_linear, p_optimizer_linear, s_net, s_optimizer, train_checkpoint)
+         
+            
+        #JOINT RL TRAINING
         s_net.p_net = Prediction_Net(input_dim, output_dim)
+        s_optimizer = torch.optim.Adam(s_net.parameters())
+        s_net.to(device)  
+        
         for param in s_net.p_net.parameters():
             param.requires_grad = False
         
-        if(pretrain != 'without_pretrain_p'):
-            for epoch in range(1,p_pretrain_epochs+1):
-                train_acc = pre_train(epoch, p_net_mlp, p_optimizer_mlp)
-                val = test(val_loader, p_net_mlp)
-                
-                log = {'epoch':epoch, 'phase': 'p_mlp_pre_train', 'train_acc': train_acc, 'val_acc': val}
-                logs.append(log)
-                
-            save_checkpoint(p_pretrain_epochs, val, p_net_mlp, p_optimizer_mlp, s_net, s_optimizer, p_mlp_pre_train_checkpoint)
+        train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth") 
+        best_val = 0
+        best_val_epoch = -1
         
-        s_net.to(device)
-        for epoch in range(1, n_epochs+1):
-            train_acc = train(epoch, tech, p_net_mlp, p_optimizer_mlp, s_net, s_optimizer)
-            val = test(val_loader, p_net_mlp)
-            q_val = q_test(val_loader, s_net, tech)
-              
-            log = {'epoch':epoch, 'phase': 'train', 'train_acc': train_acc, 'val_acc': val, 'q_val_acc':q_val}
+        for epoch in range(1,n_epochs+1):
+            rl_train(epoch, technique, p_net, p_optimizer, s_net, s_optimizer)
+            surrogate_train_acc = p_accuracy(train_loader, p_net)
+            real_train_acc = p_accuracy(real_train_loader, p_net)
+            surrogate_val_acc = p_accuracy(val_loader, p_net)
+            real_val_acc = p_accuracy(real_val_loader, p_net)
+            
+            q_surrogate_train_acc = q_accuracy(train_loader, s_net, technique)
+            q_real_train_acc = q_accuracy(real_train_loader, s_net, technique)
+            q_surrogate_val_acc = q_accuracy(val_loader, s_net, technique)
+            q_real_val_acc = q_accuracy(real_val_loader, s_net, technique)
+            
+            log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
+                       'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                       'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                       'surrogate_test_acc': None, 'real_test_acc': None, 
+                       'q_surrogate_train_acc': q_surrogate_train_acc, 'q_real_train_acc': q_real_train_acc, 
+                       'q_surrogate_val_acc': q_surrogate_val_acc, 'q_real_val_acc': q_real_val_acc, 
+                       'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                       'info': dataset_technique_path}
             logs.append(log)
             
             
-            if(val > best_val):
-                best_val = val
+            if(surrogate_val_acc > best_val):
+                best_val = surrogate_val_acc
                 best_val_epoch = epoch
-                save_checkpoint(epoch, val, p_net_mlp, p_optimizer_mlp, s_net, s_optimizer, train_checkpoint)
+                save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, s_net, s_optimizer, train_checkpoint)
          
         checkpoint = torch.load(train_checkpoint)
-        p_net_mlp.load_state_dict(checkpoint['p_net_state_dict'])
-        train_acc = test(real_train_loader, p_net_mlp)
-        val_acc = test(val_loader, p_net_mlp)
-        test_acc = test(test_loader, p_net_mlp)
-        q_test_acc = q_test(test_loader, s_net, tech)
+        p_net.load_state_dict(checkpoint['p_net_state_dict'])
+        s_net.phi_net.load_state_dict(checkpoint['s_net_state_dict'])
+        s_net.p_net.copy(p_net)
         
-        log = {'epoch':-1, 'train_epoch': best_val_epoch, 'phase': 'test', 'train_acc': train_acc, 'val_acc': val, 'test_acc': test_acc, 'q_test_acc': q_test_acc}
+        surrogate_train_acc = p_accuracy(train_loader, p_net)
+        real_train_acc = p_accuracy(real_train_loader, p_net)
+        surrogate_val_acc = p_accuracy(val_loader, p_net)
+        real_val_acc = p_accuracy(real_val_loader, p_net)
+        surrogate_test_acc = p_accuracy(test_loader, p_net)
+        real_test_acc = p_accuracy(real_test_loader, p_net)
+        
+        q_surrogate_train_acc = q_accuracy(train_loader, s_net, technique)
+        q_real_train_acc = q_accuracy(real_train_loader, s_net, technique)
+        q_surrogate_val_acc = q_accuracy(val_loader, s_net, technique)
+        q_real_val_acc = q_accuracy(real_val_loader, s_net, technique)
+        q_surrogate_test_acc = q_accuracy(test_loader, s_net, technique)
+        q_real_test_acc = q_accuracy(real_test_loader, s_net, technique)
+        
+        log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'test', 
+                       'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                       'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                       'surrogate_test_acc': surrogate_test_acc, 'real_test_acc': real_test_acc, 
+                       'q_surrogate_train_acc': q_surrogate_train_acc, 'q_real_train_acc': q_real_train_acc, 
+                       'q_surrogate_val_acc': q_surrogate_val_acc, 'q_real_val_acc': q_real_val_acc, 
+                       'q_surrogate_test_acc': q_surrogate_test_acc, 'q_real_test_acc': q_real_test_acc, 
+                       'info': dataset_technique_path}
         logs.append(log)
     
-    """
+        os.makedirs(os.path.dirname(result_log_filename_json), exist_ok=True)
+        with open(result_log_filename_json, "w") as file:
+            for log in logs:
+                json.dump(log, file)
+                file.write("\n")
+    
     
     
