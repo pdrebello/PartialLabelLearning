@@ -392,7 +392,11 @@ for filename in datasets:
          
             
         #JOINT RL TRAINING
-        s_net.p_net = Prediction_Net(input_dim, output_dim)
+        if(model == "1layer"):
+            s_net.p_net = Prediction_Net_Linear(input_dim, output_dim)
+        else:
+            s_net.p_net = Prediction_Net(input_dim, output_dim) 
+            
         s_optimizer = torch.optim.Adam(s_net.parameters())
         s_net.to(device)  
         
