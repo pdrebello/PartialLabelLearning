@@ -174,8 +174,8 @@ model = argument.model
 if(model is None):
     model = '3layer'
 
-pretrain_p = False if argument.pretrain_p == 0 else True
-pretrain_q = False if argument.pretrain_q == 0 else True
+pretrain_p = True if argument.pretrain_p == 1 else False
+pretrain_q = True if argument.pretrain_q == 1 else False
 
 
 k = 10
