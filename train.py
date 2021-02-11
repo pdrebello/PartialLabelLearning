@@ -321,7 +321,7 @@ for filename in datasets:
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
                 real_val_acc = p_accuracy(real_val_loader, p_net)
                 
-                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'pretrain_p', 
+                log = {'epoch':epoch, 'best_epoch': None,'phase': 'pretrain_p', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
                            'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
                            'surrogate_test_acc': None, 'real_test_acc': None, 
@@ -351,7 +351,7 @@ for filename in datasets:
                 surrogate_val_acc = p_accuracy(val_loader, p_net_linear)
                 real_val_acc = p_accuracy(real_val_loader, p_net_linear)
                 
-                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'pretrain_p_linear', 
+                log = {'epoch':epoch, 'best_epoch': None,'phase': 'pretrain_p_linear', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
                            'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
                            'surrogate_test_acc': None, 'real_test_acc': None, 
@@ -379,7 +379,7 @@ for filename in datasets:
                 q_surrogate_val_acc = q_accuracy(val_loader, s_net, technique)
                 q_real_val_acc = q_accuracy(real_val_loader, s_net, technique)
                 
-                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'pretrain_q', 
+                log = {'epoch':epoch, 'best_epoch': None,'phase': 'pretrain_q', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
                            'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
                            'surrogate_test_acc': None, 'real_test_acc': None, 
