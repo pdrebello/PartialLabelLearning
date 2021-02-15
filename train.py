@@ -30,6 +30,8 @@ parser.add_argument('--lambd', type=float, help="regularization cc_loss hyperpar
 parser.add_argument('--pretrain_p', type=int, help="Pretrain P network")
 parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
 
+parser.add_argument('--pretrain_p_perc', type=int, help="Pretrain P network percentage")
+
 argument = parser.parse_args()
    
 
@@ -176,7 +178,7 @@ if(model is None):
 
 pretrain_p = True if argument.pretrain_p == 1 else False
 pretrain_q = True if argument.pretrain_q == 1 else False
-
+pretrain_p_perc = argument.pretrain_p_perc
 
 k = 10
 
@@ -266,6 +268,9 @@ for filename in datasets:
                 best_val = surrogate_val_acc
                 best_val_epoch = epoch
                 save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
+            #if(epoch < 20):
+            #    checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_"+str(epoch)+".pth") 
+            #    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, checkpoint)
         
         checkpoint = torch.load(train_checkpoint)
         p_net.load_state_dict(checkpoint['p_net_state_dict'])
@@ -319,24 +324,30 @@ for filename in datasets:
         
         #Pretraining of P Network
         if(pretrain_p):
-            train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_p.pth") 
-            for epoch in range(1,pretrain_p_epochs+1):
-                train(epoch, loss_function, p_net, p_optimizer)
-                surrogate_train_acc = p_accuracy(train_loader, p_net)
-                real_train_acc = p_accuracy(real_train_loader, p_net)
-                surrogate_val_acc = p_accuracy(val_loader, p_net)
-                real_val_acc = p_accuracy(real_val_loader, p_net)
-                
-                log = {'epoch':epoch, 'best_epoch': None,'phase': 'pretrain_p', 
-                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
-                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
-                           'surrogate_test_acc': None, 'real_test_acc': None, 
-                           'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
-                           'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
-                           'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
-                           'info': dataset_technique_path}
-                logs.append(log)
-            save_checkpoint(pretrain_p_epochs, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
+            if(pretrain_p_perc == 100):
+                print("Here")
+                dataset_technique_path_load = dataset_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
+                train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth")
+                p_net.load_state_dict(checkpoint['p_net_state_dict'])
+            
+            else:
+                for epoch in range(1,pretrain_p_epochs+1):
+                    train(epoch, loss_function, p_net, p_optimizer)
+                    surrogate_train_acc = p_accuracy(train_loader, p_net)
+                    real_train_acc = p_accuracy(real_train_loader, p_net)
+                    surrogate_val_acc = p_accuracy(val_loader, p_net)
+                    real_val_acc = p_accuracy(real_val_loader, p_net)
+                    
+                    log = {'epoch':epoch, 'best_epoch': None,'phase': 'pretrain_p', 
+                               'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                               'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                               'surrogate_test_acc': None, 'real_test_acc': None, 
+                               'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
+                               'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
+                               'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                               'info': dataset_technique_path}
+                    logs.append(log)
+                save_checkpoint(pretrain_p_epochs, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
         
         #Pretraining of Q Network
         if(pretrain_q):
