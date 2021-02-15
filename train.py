@@ -183,6 +183,8 @@ k = 10
 pretrain_p_epochs = 3
 pretrain_q_epochs = 50
 
+loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
+
 for filename in datasets:
     if(filename in ['lost','MSRCv2','BirdSong']):
         n_epochs = 1000
@@ -207,7 +209,7 @@ for filename in datasets:
     
     logs = []
     
-    if((technique == "cc_loss") or (technique == "min_loss") or (technique == "naive_loss") or (technique == "iexplr_loss") or (technique == 'regularized_cc_loss')):
+    if(technique in loss_techniques):
         dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
         if(technique == "cc_loss"):
             loss_function = cc_loss
@@ -221,6 +223,11 @@ for filename in datasets:
             lambd = argument.lambd
             loss_function = lambda x, y : regularized_cc_loss(lambd, x, y)
             dataset_technique_path = os.path.join(filename, model, technique+"_"+str(lambd), str(fold_no))
+        elif(technique == "fully_supervised"):
+            loss_function = cc_loss
+            train_loader = real_train_loader
+            test_loader = real_test_loader
+            val_loader = real_val_loader
             
         
         if(model == "1layer"):
