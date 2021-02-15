@@ -30,7 +30,7 @@ parser.add_argument('--lambd', type=float, help="regularization cc_loss hyperpar
 parser.add_argument('--pretrain_p', type=int, help="Pretrain P network")
 parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
 
-parser.add_argument('--pretrain_p_perc', type=int, help="Pretrain P network percentage")
+parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network percentage")
 
 argument = parser.parse_args()
    
@@ -185,6 +185,9 @@ k = 10
 pretrain_p_epochs = 3
 pretrain_q_epochs = 50
 
+#pretrain_p_epochs = 1
+#pretrain_q_epochs = 1
+
 loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
 
 for filename in datasets:
@@ -313,8 +316,11 @@ for filename in datasets:
         overall_strategy = technique
         if(pretrain_p):
             overall_strategy += "_P"
+            if(pretrain_p_perc is not None):
+                overall_strategy += "best"
         if(pretrain_q):
             overall_strategy += "_Q"
+        
         dataset_technique_path = os.path.join(filename, model, overall_strategy, str(fold_no))
         
         result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
@@ -324,10 +330,10 @@ for filename in datasets:
         
         #Pretraining of P Network
         if(pretrain_p):
-            if(pretrain_p_perc == 100):
-                print("Here")
-                dataset_technique_path_load = dataset_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
-                train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth")
+            if(pretrain_p_perc == "best"):
+                dataset_technique_path_load = os.path.join(filename, model, "cc_loss", str(fold_no))
+                best_checkpoint = os.path.join(dump_dir, dataset_technique_path_load, "models", "train_best.pth")
+                checkpoint = torch.load(best_checkpoint)
                 p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
             else:
