@@ -165,6 +165,7 @@ def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, file
 
 
 def getPretrainPEpochs(thr, logfile):
+    thr = float(thr)/100.0
     dat = pd.read_json(logfile,orient = 'records',lines=True)
     best_val = dat['surrogate_val_acc'].iloc[-1]
     best_val
