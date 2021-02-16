@@ -352,6 +352,7 @@ for filename in datasets:
                 dataset_technique_path_load = os.path.join(filename, model, "cc_loss", str(fold_no))
                 pretrain_logfile = os.path.join(dump_dir, dataset_technique_path_load, "logs", "log.json")
                 pretrain_p_epochs = getPretrainPEpochs(pretrain_p_perc, pretrain_logfile)
+                train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_p.pth")
                 for epoch in range(1,pretrain_p_epochs+1):
                     train(epoch, loss_function, p_net, p_optimizer)
                     surrogate_train_acc = p_accuracy(train_loader, p_net)
