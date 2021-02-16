@@ -15,6 +15,7 @@ import os
 import json
 import argparse
 import numpy as np
+import pandas as pd
 
 parser = argparse.ArgumentParser(description = "Description for my parser")
 
@@ -162,6 +163,16 @@ def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, file
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     torch.save(checkpoint, filename)
 
+
+def getPretrainPEpochs(thr, logfile):
+    dat = pd.read_json(logfile,orient = 'records',lines=True)
+    best_val = dat['surrogate_val_acc'].iloc[-1]
+    best_val
+    dat = dat[dat['epoch'] >= 0]
+    epsilon = 0.00001
+    thr = thr - epsilon
+    pretrain_till = dat['epoch'][dat['surrogate_val_acc']/best_val >= thr].iloc[0]
+    return pretrain_till
 
 dump_dir = argument.dump_dir
 filename = argument.dataset
@@ -317,7 +328,7 @@ for filename in datasets:
         if(pretrain_p):
             overall_strategy += "_P"
             if(pretrain_p_perc is not None):
-                overall_strategy += "best"
+                overall_strategy += pretrain_p_perc
         if(pretrain_q):
             overall_strategy += "_Q"
         
@@ -337,6 +348,9 @@ for filename in datasets:
                 p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
             else:
+                dataset_technique_path_load = os.path.join(filename, model, "cc_loss", str(fold_no))
+                pretrain_logfile = os.path.join(dump_dir, dataset_technique_path_load, "logs", "log.json")
+                pretrain_p_epochs = getPretrainPEpochs(pretrain_p_perc, pretrain_logfile)
                 for epoch in range(1,pretrain_p_epochs+1):
                     train(epoch, loss_function, p_net, p_optimizer)
                     surrogate_train_acc = p_accuracy(train_loader, p_net)
@@ -367,6 +381,10 @@ for filename in datasets:
             s_net.to(device)   
             
             train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_p_linear.pth") 
+            
+            dataset_technique_path_load = os.path.join(filename, "1layer", "cc_loss", str(fold_no))
+            pretrain_logfile = os.path.join(dump_dir, dataset_technique_path_load, "logs", "log.json")
+            pretrain_p_epochs = getPretrainPEpochs(pretrain_p_perc, pretrain_logfile)
             for epoch in range(1,pretrain_p_epochs+1):
                 train(epoch, loss_function, p_net_linear, p_optimizer_linear)
                 surrogate_train_acc = p_accuracy(train_loader, p_net_linear)
