@@ -241,7 +241,7 @@ for filename in datasets:
             loss_function = lambda x, y : regularized_cc_loss(lambd, x, y)
             dataset_technique_path = os.path.join(filename, model, technique+"_"+str(lambd), str(fold_no))
         elif(technique == "fully_supervised"):
-            loss_function = cc_loss
+            loss_function = min_loss
             train_loader = real_train_loader
             test_loader = real_test_loader
             val_loader = real_val_loader
@@ -387,6 +387,7 @@ for filename in datasets:
             dataset_technique_path_load = os.path.join(filename, "1layer", "cc_loss", str(fold_no))
             pretrain_logfile = os.path.join(dump_dir, dataset_technique_path_load, "logs", "log.json")
             pretrain_p_epochs = getPretrainPEpochs(pretrain_p_perc, pretrain_logfile)
+            
             for epoch in range(1,pretrain_p_epochs+1):
                 train(epoch, loss_function, p_net_linear, p_optimizer_linear)
                 surrogate_train_acc = p_accuracy(train_loader, p_net_linear)
