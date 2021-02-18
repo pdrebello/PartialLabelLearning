@@ -3,6 +3,11 @@ import torch
 import numpy as np
 import random
 import pickle
+import torch
+import torchvision
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.utils.data
 
 class Dataset(torch.utils.data.Dataset):
   'Characterizes a dataset for PyTorch'
