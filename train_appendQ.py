@@ -7,19 +7,34 @@ Created on Wed Feb 17 11:48:59 2021
 """
 
 
-from dataset import Dataset, loadTrain, loadTrainT
-from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
-from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
-
-from train import q_accuracy_Subset
 import torch
 import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.data
+import scipy.io
+from dataset import Dataset, loadTrain, loadTrainT
+from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
+import sys
+from IPython.core.debugger import Pdb
+import random
+import csv
+import os
+import json
+import argparse
+import numpy as np
+import pandas as pd
 
 import json
 import pandas as pd
 import os
+
+from dataset import Dataset, loadTrain, loadTrainT
+from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
+
+
 batch_size_train = 64
 batch_size_test = 1000
 learning_rate = 0.001
