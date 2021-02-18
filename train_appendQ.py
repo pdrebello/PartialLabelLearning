@@ -5,17 +5,12 @@ Created on Wed Feb 17 11:48:59 2021
 
 @author: pratheek
 """
-
-
 import torch
 import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 import scipy.io
-from dataset import Dataset, loadTrain, loadTrainT
-from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
-from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
 from IPython.core.debugger import Pdb
 import random
@@ -33,7 +28,7 @@ import os
 from dataset import Dataset, loadTrain, loadTrainT
 from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
-
+from train import q_accuracy_Subset
 
 batch_size_train = 64
 batch_size_test = 1000
@@ -79,19 +74,15 @@ for filename in datasets:
     for model in models:
         
         directory = os.path.join(dump_dir, filename, model)
-        print(directory)
         try:
-            
             directories = os.listdir(directory)
-            
         except:
             continue
-        print(directories)
         directories = [x for x in directories if ('rl' in x)]
         
         for method in directories:
             for fold_no in range(10):
-                print(method)
+                
                 train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
                             
                 train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -112,17 +103,27 @@ for filename in datasets:
                     p_net = Prediction_Net_Linear(input_dim, output_dim)
                 else:
                     p_net = Prediction_Net(input_dim, output_dim)  
+                
+                
                     
                 p_net.to(device)
                 p_optimizer = torch.optim.Adam(p_net.parameters())
                 s_net = Selection_Net(input_dim, output_dim, True)
+                if(model == "1layer"):
+                    s_net.p_net = Prediction_Net_Linear(input_dim, output_dim)
+                else:
+                    s_net.p_net = Prediction_Net(input_dim, output_dim) 
                 s_net.to(device)
+                
+                for param in s_net.p_net.parameters():
+                    param.requires_grad = False
                 
                 overall_strategy = method
                 if('linear' in overall_strategy):
                     technique = 'linear_rl'
                 else:
                     technique = 'exponential_rl'
+                #print(technique)
                 """
                 if(pretrain_p):
                     overall_strategy += "_P"
@@ -140,7 +141,7 @@ for filename in datasets:
                 train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth") 
                 try:
                     checkpoint = torch.load(train_checkpoint)
-                    print(overall_strategy)
+                    #print(overall_strategy)
                 except:
                     #print("Absent: "+train_checkpoint)
                     continue
