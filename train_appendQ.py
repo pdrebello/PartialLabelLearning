@@ -54,10 +54,10 @@ argument = parser.parse_args()
 
 dump_dir = argument.dump_dir
 
-log_file = "results/11022021/MSRCv2/3layer/cc_loss/9/logs/log.json"
-dat = pd.read_json(log_file,orient = 'records',lines=True)
-dat = dat.where(pd.notnull(dat), None)
-data = dat.to_dict(orient='records')
+#log_file = "results/11022021/MSRCv2/3layer/cc_loss/9/logs/log.json"
+#dat = pd.read_json(log_file,orient = 'records',lines=True)
+#dat = dat.where(pd.notnull(dat), None)
+#data = dat.to_dict(orient='records')
 
 #filename = 'lost'
 #fold_no = 9
@@ -74,12 +74,13 @@ for filename in datasets:
     for model in models:
         
         directory = os.path.join(dump_dir, filename, model)
+        print(directory)
         try:
             directories = os.listdir(directory)
         except:
             continue
         directories = [x for x in directories if ('rl' in x)]
-        
+        print(directory) 
         for method in directories:
             for fold_no in range(10):
                 
@@ -155,7 +156,7 @@ for filename in datasets:
                 q_surrogate_subset_test_acc = q_accuracy_Subset(test_loader, test_loader, s_net, technique)
                 q_real_subset_test_acc = q_accuracy_Subset(real_test_loader, test_loader, s_net, technique)
         
-                dat = pd.read_json(log_file,orient = 'records',lines=True)
+                dat = pd.read_json(result_log_filename_json,orient = 'records',lines=True)
                 dat = dat.where(pd.notnull(dat), None)
                 data = dat.to_dict(orient='records')
                 
@@ -174,7 +175,10 @@ for filename in datasets:
                         entry['q_real_subset_val_acc'] = None
                         entry['q_surrogate_subset_test_acc'] = None
                         entry['q_real_subset_test_acc'] = None
-    
+                with open(result_log_filename_json, "w") as file:
+                    for log in data:
+                        json.dump(log, file)
+                        file.write("\n")
 #dat.to_json()
 
 #with open("test.json", "w") as jsonFile:
