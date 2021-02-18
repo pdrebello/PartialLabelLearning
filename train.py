@@ -151,7 +151,7 @@ def q_accuracy_Subset(real_test_data, partial_test_data, q_net, rl_technique):
             target = data[0][1]
             partial_data = data[1][0]
             partial_target = data[1][1]
-            
+            real_data, target, partial_data, partial_target = real_data.to(device), target.to(device), partial_data.to(device), partial_target.to(device) 
             assert(torch.equal(real_data, partial_data))
                 
             output = q_net.forward(partial_data, partial_target, rl_technique)
