@@ -130,13 +130,13 @@ def remake(filename, newname):
         pickle.dump(partials, f)
         pickle.dump(new_target, f)
 
-for i in ["A","B","C"]:
-    newname = "_shuffle"+i
-    remake("BirdSong", newname)
-    remake("lost", newname)
-    remake("Soccer Player", newname)
-    remake("Yahoo! News", newname)
-    remake("MSRCv2", newname)
+#for i in ["A","B","C"]:
+#    newname = "_shuffle"+i
+#    remake("BirdSong", newname)
+#    remake("lost", newname)
+#    remake("Soccer Player", newname)
+#    remake("Yahoo! News", newname)
+#    remake("MSRCv2", newname)
 
 def loadTrain(filename, fold_no, k):  
     
