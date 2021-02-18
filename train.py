@@ -32,6 +32,7 @@ parser.add_argument('--pretrain_p', type=int, help="Pretrain P network")
 parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
 
 parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network percentage")
+parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
 
 argument = parser.parse_args()
    
@@ -228,6 +229,12 @@ def main():
     #pretrain_p_epochs = 1
     #pretrain_q_epochs = 1
     
+    #Mausam Experiment. Modified datasets
+    shuffle_name = argument.shuffle
+    
+    #if(shuffle_name is not None):
+    #    append_tag = append_tag + "_" + shuffle_name
+        
     loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
     
     for filename in datasets:
@@ -236,6 +243,8 @@ def main():
         else:
             n_epochs = 150
         #n_epochs = 2
+        if(shuffle_name is not None):
+            filename = filename +"_"+shuffle_name
         train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
         
         train_loader = torch.utils.data.DataLoader(train_dataset,

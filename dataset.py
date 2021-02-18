@@ -108,7 +108,7 @@ def prepTrain(filename):
 
     #return train_dataset, test_dataset, real_train_dataset, data.shape[1], partials.shape[1]
 def remake(filename, newname):
-    with open("datasets/"+filename+".pkl", "rb") as f:
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
         data = pickle.load(f)
         partials = pickle.load(f)
         target = pickle.load(f)
@@ -125,18 +125,18 @@ def remake(filename, newname):
         rand = random.choice(indices)
         new_target[i,rand] = 1
         
-    with open("datasets/"+filename+newname+".pkl", "wb") as f:
+    with open("datasets/"+filename+newname+".mat.pkl", "wb") as f:
         pickle.dump(data, f)
         pickle.dump(partials, f)
         pickle.dump(new_target, f)
 
 for i in ["A","B","C"]:
     newname = "_shuffle"+i
-    remake("BirdSong.mat", newname)
-    remake("lost.mat", newname)
-    remake("Soccer Player.mat", newname)
-    remake("Yahoo! News.mat", newname)
-    remake("MSRCv2.mat", newname)
+    remake("BirdSong", newname)
+    remake("lost", newname)
+    remake("Soccer Player", newname)
+    remake("Yahoo! News", newname)
+    remake("MSRCv2", newname)
 
 def loadTrain(filename, fold_no, k):  
     
