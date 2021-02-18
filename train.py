@@ -53,7 +53,7 @@ random.seed(random_seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train(epoch, loss_function, p_net, p_optimizer):
+def train(epoch, train_loader, loss_function, p_net, p_optimizer):
     p_net.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         
@@ -72,7 +72,7 @@ def train(epoch, loss_function, p_net, p_optimizer):
             epoch, batch_idx * len(data), len(train_loader.dataset),
             100. * batch_idx / len(train_loader), loss.item()))
 
-def rl_train(epoch, rl_technique, p_net, p_optimizer, s_net, s_optimizer):
+def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_optimizer):
     p_net.train()
     s_net.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -292,7 +292,7 @@ def main():
             best_val = 0
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
-                train(epoch, loss_function, p_net, p_optimizer)
+                train(epoch, train_loader, loss_function, p_net, p_optimizer)
                 surrogate_train_acc = p_accuracy(train_loader, p_net)
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
@@ -382,7 +382,7 @@ def main():
                     pretrain_p_epochs = getPretrainPEpochs(pretrain_p_perc, pretrain_logfile)
                     train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_p.pth")
                     for epoch in range(1,pretrain_p_epochs+1):
-                        train(epoch, loss_function, p_net, p_optimizer)
+                        train(epoch, train_loader, loss_function, p_net, p_optimizer)
                         surrogate_train_acc = p_accuracy(train_loader, p_net)
                         real_train_acc = p_accuracy(real_train_loader, p_net)
                         surrogate_val_acc = p_accuracy(val_loader, p_net)
@@ -417,7 +417,7 @@ def main():
                 pretrain_p_epochs = getPretrainPEpochs(pretrain_p_perc, pretrain_logfile)
                 
                 for epoch in range(1,pretrain_p_epochs+1):
-                    train(epoch, loss_function, p_net_linear, p_optimizer_linear)
+                    train(epoch, train_loader, loss_function, p_net_linear, p_optimizer_linear)
                     surrogate_train_acc = p_accuracy(train_loader, p_net_linear)
                     real_train_acc = p_accuracy(real_train_loader, p_net_linear)
                     surrogate_val_acc = p_accuracy(val_loader, p_net_linear)
@@ -440,7 +440,7 @@ def main():
                 
                 train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "pretrain_q.pth") 
                 for epoch in range(1,pretrain_q_epochs+1):
-                    rl_train(epoch, technique, p_net_linear, p_optimizer_linear, s_net, s_optimizer)
+                    rl_train(epoch, train_loader, technique, p_net_linear, p_optimizer_linear, s_net, s_optimizer)
                     surrogate_train_acc = p_accuracy(train_loader, p_net_linear)
                     real_train_acc = p_accuracy(real_train_loader, p_net_linear)
                     surrogate_val_acc = p_accuracy(val_loader, p_net_linear)
@@ -480,7 +480,7 @@ def main():
             best_val_epoch = -1
             
             for epoch in range(1,n_epochs+1):
-                rl_train(epoch, technique, p_net, p_optimizer, s_net, s_optimizer)
+                rl_train(epoch, train_loader, technique, p_net, p_optimizer, s_net, s_optimizer)
                 surrogate_train_acc = p_accuracy(train_loader, p_net)
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
