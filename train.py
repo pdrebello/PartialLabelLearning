@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import scipy.io
-from dataset import Dataset, loadTrain, loadTrainT
+from dataset import Dataset, loadTrain
 from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
