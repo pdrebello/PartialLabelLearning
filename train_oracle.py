@@ -76,46 +76,70 @@ def train(epoch, train_loader, loss_function, p_net, p_optimizer):
 def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_optimizer):
     p_net.train()
     s_net.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
+    if(rl_technique == "oracle_rl"):
+        for batch_idx, (data, target) in enumerate(train_loader):
         
-        data, target = data.to(device), target.to(device)
-        
-        p_optimizer.zero_grad()
-        s_optimizer.zero_grad()
-        
-        #prob output of prediction network
-        p = p_net(data)
-        q = s_net(data, target, rl_technique)
-        
-        if(rl_technique == 'exponential_rl'):
-            if(torch.isnan(q.sum())):
-                Pdb().set_trace()
-            with torch.no_grad():
-                m = torch.distributions.bernoulli.Bernoulli(q)
-                a = m.sample()
-            mask = target
-            reward = sample_reward_function(p.detach(), q, a, mask)
-            loss = sample_loss_function(p, q.detach(), a, mask)
-        else:
+            data, target = data.to(device), target.to(device)
+            
+            p_optimizer.zero_grad()
+            p = p_net(data)
+            q = target
+            
+            
             mask = target
             loss = select_loss_function(p, q.detach(),mask)
-            reward = select_reward_function(p.detach(), q, mask)
-        
-        loss.backward()
-        reward.backward()
-        
-        p_optimizer.step()
-        s_optimizer.step()
-        
-        
-        if batch_idx % 100 == 0:
-            s_net.p_net.copy(p_net)
-        
-        if batch_idx % log_interval == 0:
-          print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tReward: {:.6f}'.format(
-            epoch, batch_idx * len(data), len(train_loader.dataset),
-            100. * batch_idx / len(train_loader), loss.item(), reward.item()))
-          
+            
+            loss.backward()
+            
+            p_optimizer.step()
+            
+            if batch_idx % log_interval == 0:
+              print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item()))
+    else:
+        for batch_idx, (data, target) in enumerate(train_loader):
+            
+            data, target = data.to(device), target.to(device)
+            
+            p_optimizer.zero_grad()
+            s_optimizer.zero_grad()
+            
+            #prob output of prediction network
+            p = p_net(data)
+            q = s_net(data, target, rl_technique)
+            
+            if(rl_technique == 'exponential_rl'):
+                if(torch.isnan(q.sum())):
+                    Pdb().set_trace()
+                with torch.no_grad():
+                    m = torch.distributions.bernoulli.Bernoulli(q)
+                    a = m.sample()
+                mask = target
+                reward = sample_reward_function(p.detach(), q, a, mask)
+                loss = sample_loss_function(p, q.detach(), a, mask)
+            else:
+                mask = target
+                loss = select_loss_function(p, q.detach(),mask)
+                reward = select_reward_function(p.detach(), q, mask)
+            
+            loss.backward()
+            reward.backward()
+            
+            p_optimizer.step()
+            s_optimizer.step()
+            
+            
+            if batch_idx % 100 == 0:
+                s_net.p_net.copy(p_net)
+            
+            if batch_idx % log_interval == 0:
+              print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tReward: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item(), reward.item()))
+
+
+         
 def p_accuracy(test_data, p_net):
     p_net.eval()
     correct = 0
