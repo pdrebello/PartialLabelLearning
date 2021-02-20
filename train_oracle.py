@@ -374,7 +374,7 @@ def main():
                     json.dump(log, file)
                     file.write("\n")
             
-        elif((technique == "linear_rl") or (technique == "exponential_rl")):    
+        elif((technique == "linear_rl") or (technique == "exponential_rl") or (technique == "oracle_rl")):    
             loss_function = cc_loss
             
             if(model == "1layer"):
