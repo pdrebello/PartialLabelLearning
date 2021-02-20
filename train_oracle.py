@@ -77,6 +77,7 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
     p_net.train()
     s_net.train()
     if(rl_technique == "oracle_rl"):
+        print("ORACLE")
         for batch_idx, (data, target) in enumerate(train_loader):
         
             data, target = data.to(device), target.to(device)
