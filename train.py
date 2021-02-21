@@ -33,6 +33,7 @@ parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
 
 parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network percentage")
 parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
+parser.add_argument('--optimizer', type=str, help="Optimizer: default Adam")
 
 argument = parser.parse_args()
    
@@ -237,6 +238,15 @@ def main():
         
     loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
     
+    if((argument.optimizer is None) or (argument.optimizer == "Adam")):
+        optimizer = torch.optim.Adam
+    elif(argument.optimizer == 'SGD'):
+        optimizer = lambda x: torch.optim.SGD(x, lr=0.01, momentum=0.9)
+        #optimizer = torch.optim.SGD
+    else:
+        optimizer = torch.optim.Adam
+        
+    
     for filename in datasets:
         if(filename in ['lost','MSRCv2','BirdSong']):
             n_epochs = 1000
@@ -290,7 +300,7 @@ def main():
                 p_net = Prediction_Net(input_dim, output_dim)
                 
             p_net.to(device)
-            p_optimizer = torch.optim.Adam(p_net.parameters())
+            p_optimizer = optimizer(p_net.parameters())
             
             
             
@@ -358,7 +368,7 @@ def main():
             else:
                 p_net = Prediction_Net(input_dim, output_dim)   
             p_net.to(device)
-            p_optimizer = torch.optim.Adam(p_net.parameters())
+            p_optimizer = optimizer(p_net.parameters())
             s_net = Selection_Net(input_dim, output_dim, True)
             s_net.to(device)
             
@@ -413,8 +423,8 @@ def main():
                 p_net_linear = Prediction_Net_Linear(input_dim, output_dim)
                 s_net.p_net = Prediction_Net_Linear(input_dim, output_dim)
                 
-                p_optimizer_linear = torch.optim.Adam(p_net_linear.parameters())
-                s_optimizer = torch.optim.Adam(s_net.parameters())
+                p_optimizer_linear = optimizer(p_net_linear.parameters())
+                s_optimizer = optimizer(s_net.parameters())
                 
                 p_net_linear.to(device)
                 s_net.to(device)   
@@ -478,7 +488,7 @@ def main():
             else:
                 s_net.p_net = Prediction_Net(input_dim, output_dim) 
                 
-            s_optimizer = torch.optim.Adam(s_net.parameters())
+            s_optimizer = optimizer(s_net.parameters())
             s_net.to(device)  
             
             for param in s_net.p_net.parameters():
