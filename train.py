@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 import scipy.io
 from dataset import Dataset, loadTrain
-from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function, ce_loss, cc_loss_stable
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
 from IPython.core.debugger import Pdb
@@ -34,11 +34,11 @@ parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
 parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network percentage")
 parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
 parser.add_argument('--optimizer', type=str, help="Optimizer: default Adam")
-
+parser.add_argument('--batch_size', type=int, help="batch_size", default = 64)
 argument = parser.parse_args()
    
 
-batch_size_train = 64
+batch_size_train = argument.batch_size
 batch_size_test = 1000
 learning_rate = 0.001
 momentum = 0.5
@@ -47,11 +47,14 @@ log_interval = 10
 epsilon = 1e-6
 
 #Reproducibility
-random_seed = 1
-torch.backends.cudnn.enabled = False
-torch.manual_seed(random_seed)
-np.random.seed(random_seed)
-random.seed(random_seed)
+def set_random_seeds(random_seed):
+    torch.backends.cudnn.enabled = False
+    torch.manual_seed(random_seed)
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+
+set_random_seeds(1)
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -62,9 +65,13 @@ def train(epoch, train_loader, loss_function, p_net, p_optimizer):
         data, target = data.to(device), target.to(device)
         
         p_optimizer.zero_grad()
+        #Pdb().set_trace() 
         output = p_net(data)
         
         loss = loss_function(output, target)
+        loss_cc_stable = cc_loss_stable(output, target)
+        Pdb().set_trace()
+
         loss.backward()
         
         p_optimizer.step()
@@ -239,16 +246,19 @@ def main():
     loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
     
     if((argument.optimizer is None) or (argument.optimizer == "Adam")):
-        optimizer = torch.optim.Adam
+        optimizer = lambda x: torch.optim.Adam(x,weight_decay = 0.000001)
+        #optimizer = torch.optim.Adam
     elif(argument.optimizer == 'SGD'):
-        optimizer = lambda x: torch.optim.SGD(x, lr=0.01, momentum=0.9)
+        optimizer = lambda x: torch.optim.SGD(x, lr=0.1, momentum=0.9)
         #optimizer = torch.optim.SGD
     else:
         optimizer = torch.optim.Adam
         
     
     for filename in datasets:
-        if(filename in ['lost','MSRCv2','BirdSong']):
+        if filename == 'lost':
+            n_epochs = 150
+        elif(filename in ['MSRCv2','BirdSong']):
             n_epochs = 1000
         else:
             n_epochs = 150
@@ -258,18 +268,18 @@ def main():
         train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
         
         train_loader = torch.utils.data.DataLoader(train_dataset,
-          batch_size=batch_size_train, shuffle=True)
+          batch_size=batch_size_train, shuffle=False)
         test_loader = torch.utils.data.DataLoader(test_dataset,
-          batch_size=batch_size_test, shuffle=True)
+          batch_size=batch_size_test, shuffle=False)
         val_loader = torch.utils.data.DataLoader(val_dataset,
-          batch_size=batch_size_test, shuffle=True)
+          batch_size=batch_size_test, shuffle=False)
         
         real_train_loader = torch.utils.data.DataLoader(real_train_dataset,
-          batch_size=batch_size_train, shuffle=True)
+          batch_size=batch_size_train, shuffle=False)
         real_test_loader = torch.utils.data.DataLoader(real_test_dataset,
-          batch_size=batch_size_test, shuffle=True)
+          batch_size=batch_size_test, shuffle=False)
         real_val_loader = torch.utils.data.DataLoader(real_val_dataset,
-          batch_size=batch_size_test, shuffle=True)
+          batch_size=batch_size_test, shuffle=False)
         
         logs = []
         
@@ -288,12 +298,14 @@ def main():
                 loss_function = lambda x, y : regularized_cc_loss(lambd, x, y)
                 dataset_technique_path = os.path.join(filename, model, technique+"_"+str(lambd), str(fold_no))
             elif(technique == "fully_supervised"):
-                loss_function = min_loss
+                #loss_function = ce_loss
+                loss_function = naive_loss
+                #loss_function = min_loss
                 train_loader = real_train_loader
                 test_loader = real_test_loader
                 val_loader = real_val_loader
                 
-            
+            set_random_seeds(1) 
             if(model == "1layer"):
                 p_net = Prediction_Net_Linear(input_dim, output_dim)
             else:
