@@ -110,8 +110,8 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
             reward = sample_reward_function(p.detach(), q, a, mask)
             loss = sample_loss_function(p, q.detach(), a, mask)
             
-            old_loss = old_sample_loss_function(p, q.detach(), a, mask)
-            old_reward = old_sample_reward_function(p.detach(), q, a, mask)
+            #old_loss = old_sample_loss_function(p, q.detach(), a, mask)
+            #old_reward = old_sample_reward_function(p.detach(), q, a, mask)
             
             if((torch.isnan(loss)) or (torch.isinf(loss))):
                 Pdb().set_trace()
