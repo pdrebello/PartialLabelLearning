@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from IPython.core.debugger import Pdb
 class Prediction_Net_Linear(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(Prediction_Net_Linear, self).__init__()
@@ -9,8 +9,10 @@ class Prediction_Net_Linear(nn.Module):
         torch.nn.init.xavier_uniform(self.fc1.weight)
 
     def forward(self, x):
-        x = F.softmax(self.fc1(x))
-        return x
+        #Pdb().set_trace()
+        #x = F.softmax(self.fc1(x))
+        return self.fc1(x) 
+        #return x
     
     def copy(self, net2):
         self.load_state_dict(net2.state_dict())
@@ -31,7 +33,8 @@ class Prediction_Net(nn.Module):
     def forward(self, x):
         x = F.elu(self.bn1(self.fc1(x)))
         x = F.elu(self.bn2(self.fc2(x)))
-        x = F.softmax(self.fc3(x))
+        x = self.fc3(x)
+        #x = F.softmax(self.fc3(x))
         return x
     
     def copy(self, net2):
