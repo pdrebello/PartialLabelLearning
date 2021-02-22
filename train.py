@@ -270,9 +270,7 @@ def main():
         
     
     for filename in datasets:
-        if filename == 'lost':
-            n_epochs = 150
-        elif(filename in ['MSRCv2','BirdSong']):
+        if(filename in ['MSRCv2','BirdSong']):
             n_epochs = 1000
         else:
             n_epochs = 150
