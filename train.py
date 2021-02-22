@@ -5,7 +5,8 @@ import torch.nn.functional as F
 
 import scipy.io
 from dataset import Dataset, loadTrain
-from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function, ce_loss, cc_loss_stable
+from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+#from losses import *
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
 from IPython.core.debugger import Pdb
@@ -69,8 +70,12 @@ def train(epoch, train_loader, loss_function, p_net, p_optimizer):
         output = p_net(data)
         
         loss = loss_function(output, target)
-        loss_cc_stable = cc_loss_stable(output, target)
-        Pdb().set_trace()
+        #loss_cc_stable = cc_loss_stable(output, target)
+        #loss = cc_loss(output, target)
+        #loss_cc_stable = cc_loss_stable(output, target)
+        #print(loss - loss_cc_stable)
+        #if(loss - loss_cc_stable > 0.001):
+        #    Pdb().set_trace()
 
         loss.backward()
         
@@ -96,18 +101,27 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
         q = s_net(data, target, rl_technique)
         
         if(rl_technique == 'exponential_rl'):
-            if(torch.isnan(q.sum())):
-                Pdb().set_trace()
+            
             with torch.no_grad():
-                m = torch.distributions.bernoulli.Bernoulli(q)
+                q_prob = torch.sigmoid(q)
+                m = torch.distributions.bernoulli.Bernoulli(q_prob)
                 a = m.sample()
             mask = target
             reward = sample_reward_function(p.detach(), q, a, mask)
             loss = sample_loss_function(p, q.detach(), a, mask)
+            
+            old_loss = old_sample_loss_function(p, q.detach(), a, mask)
+            old_reward = old_sample_reward_function(p.detach(), q, a, mask)
+            
+            if((torch.isnan(loss)) or (torch.isinf(loss))):
+                Pdb().set_trace()
+            if((torch.isnan(reward)) or (torch.isinf(reward))):
+                Pdb().set_trace()
         else:
             mask = target
             loss = select_loss_function(p, q.detach(),mask)
             reward = select_reward_function(p.detach(), q, mask)
+            
         
         loss.backward()
         reward.backward()

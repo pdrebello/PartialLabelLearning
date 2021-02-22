@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from IPython.core.debugger import Pdb
+
+epsilon = 1e-6
+
 class Prediction_Net_Linear(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(Prediction_Net_Linear, self).__init__()
@@ -69,11 +72,11 @@ class Phi_Net(nn.Module):
         x = F.elu(self.bn1(self.fc1(x)))
         x = F.elu(self.bn2(self.fc2(x)))
         x = self.fc3(x)
-        x[~mask] = float('-inf')
-        if(rl_technique == "sample"):
-            x = F.sigmoid(x)
-        else:
-            x = F.softmax(x)
+        x[~mask] = epsilon
+        #if(rl_technique == "sample"):
+        #    x = F.sigmoid(x)
+        #else:
+        #    x = F.softmax(x)
         return x
     
     def copy(self, net2):
