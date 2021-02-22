@@ -62,8 +62,8 @@ def min_loss(output, target):
     
     loss = torch.log_softmax(output, dim=-1)
     #loss = loss[target == 0] = -float('inf')
-    #mask = target == 1
-    loss.masked_fill((1-target),-float('inf'))
+    mask = target == 0
+    loss.masked_fill(mask,-float('inf'))
     #loss[~mask] = -float('inf')
     loss = torch.max(loss, dim = 1).values
     loss = -loss.mean()
