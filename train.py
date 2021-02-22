@@ -270,8 +270,10 @@ def main():
         
     
     for filename in datasets:
-        if(filename in ['lost','MSRCv2','BirdSong']):
+        if(filename in ['lost','MSRCv2']):
             n_epochs = 1000
+        elif(filename in ['BirdSong']):
+            n_epochs = 1500
         else:
             n_epochs = 150
         #n_epochs = 2
@@ -340,7 +342,7 @@ def main():
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
                 real_val_acc = p_accuracy(real_val_loader, p_net)
-                print(surrogate_val_acc)
+                #print(surrogate_val_acc)
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
