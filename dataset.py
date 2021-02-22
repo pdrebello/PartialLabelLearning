@@ -15,6 +15,9 @@ class Dataset(torch.utils.data.Dataset):
         'Initialization'
         self.labels = labels.astype(np.float32)
         self.data = data.astype(np.float32)
+        
+        self.data -= np.mean(self.data, axis=0)
+        self.data /= np.std(self.data, axis=0)
 
   def __len__(self):
         'Denotes the total number of samples'
