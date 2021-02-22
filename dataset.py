@@ -16,9 +16,6 @@ class Dataset(torch.utils.data.Dataset):
         self.labels = labels.astype(np.float32)
         self.data = data.astype(np.float32)
         
-        self.data -= np.mean(self.data, axis=0)
-        self.data /= np.std(self.data, axis=0)
-
   def __len__(self):
         'Denotes the total number of samples'
         return self.data.shape[0]
@@ -147,7 +144,8 @@ def loadTrain(filename, fold_no, k):
         data = pickle.load(f)
         partials = pickle.load(f)
         target = pickle.load(f)
-    
+    data -= np.mean(data, axis=0)
+    data /= np.std(data, axis=0)
     split = int(data.shape[0]/k)
     
     train_data_list = []
