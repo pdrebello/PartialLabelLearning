@@ -343,6 +343,7 @@ def main():
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
                 real_val_acc = p_accuracy(real_val_loader, p_net)
                 #print(surrogate_val_acc)
+                #print(real_val_acc)
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
