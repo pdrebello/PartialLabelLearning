@@ -211,7 +211,7 @@ def loadTrain(filename, fold_no, k):
     return train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, data.shape[1], partials.shape[1]
 
 def main():
-    for i in [2,4,6,8,10,12]:
+    for i in [2,4,8,12,16,20,22]:
         remakeCC("MSRCv2", i)
     for i in [2,4,8,16,32,64,128]:
         remakeCC("Soccer Player", i)
