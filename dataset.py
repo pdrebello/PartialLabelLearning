@@ -145,8 +145,8 @@ def remakeCC(filename, add_number):
         fill_up_indices = random.sample(choices, add_number)
         
         for j in fill_up_indices:
-            new_partials[i,j] == 1
-        
+            new_partials[i,j] = 1
+            #print(new_partials[i,j])   
     with open("datasets/"+filename+"_"+str(add_number)+".mat.pkl", "wb") as f:
         pickle.dump(data, f)
         pickle.dump(new_partials, f)
@@ -215,7 +215,10 @@ def main():
         remakeCC("lost", i)
     for i in [2,4,8,16,32,64,128]:
         remakeCC("Soccer Player", i)
-         
+    #for i in [4]:
+    #    remakeCC("lost", i)
+    #train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain("lost_4.mat", 0, 10)
+    #print(val_dataset.labels.sum(axis=1))        
 if __name__ == "__main__":
     main() 
     
