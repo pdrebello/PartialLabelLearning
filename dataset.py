@@ -129,15 +129,29 @@ def remake(filename, newname):
         pickle.dump(data, f)
         pickle.dump(partials, f)
         pickle.dump(new_target, f)
-
-#for i in ["A","B","C"]:
-#    newname = "_shuffle"+i
-#    remake("BirdSong", newname)
-#    remake("lost", newname)
-#    remake("Soccer Player", newname)
-#    remake("Yahoo! News", newname)
-#    remake("MSRCv2", newname)
-
+        
+        
+def remakeCC(filename, add_number):
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+        
+    new_partials = np.copy(partials)
+    print(new_partials.shape[1])
+    choices = range(new_partials.shape[1])
+    
+    for i in range(partials.shape[0]):
+        fill_up_indices = random.sample(choices, add_number)
+        
+        for j in fill_up_indices:
+            new_partials[i,j] == 1
+        
+    with open("datasets/"+filename+"_"+str(add_number)+".mat.pkl", "wb") as f:
+        pickle.dump(data, f)
+        pickle.dump(new_partials, f)
+        pickle.dump(target, f)
+        
 def loadTrain(filename, fold_no, k):  
     
     with open("datasets/"+filename+".pkl", "rb") as f:
@@ -195,3 +209,13 @@ def loadTrain(filename, fold_no, k):
     
     #return train_data, test_data
     return train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, data.shape[1], partials.shape[1]
+
+def main():
+    for i in [2,4,6,8,12,14]:
+        remakeCC("lost", i)
+    for i in [2,4,8,16,32,64,128]:
+        remakeCC("Soccer Player", i)
+         
+if __name__ == "__main__":
+    main() 
+    
