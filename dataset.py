@@ -215,6 +215,10 @@ def main():
         remakeCC("MSRCv2", i)
     for i in [2,4,8,16,32,64,128]:
         remakeCC("Soccer Player", i)
+    for i in [2,4,6,8,10,12,14]:
+        remakeCC("lost", i)
+    for i in [2,4,6,8,10,12]:
+        remakeCC("BirdSong", i)
     #for i in [4]:
     #    remakeCC("lost", i)
     #train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain("lost_4.mat", 0, 10)
