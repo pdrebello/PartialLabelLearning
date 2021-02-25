@@ -217,7 +217,7 @@ def main():
         remakeCC("Soccer Player", i)
     for i in [2,4,6,8,10,12,14]:
         remakeCC("lost", i)
-    for i in [2,4,6,8,10,12]:
+    for i in [1,2,4,6,8,10,12]:
         remakeCC("BirdSong", i)
     #for i in [4]:
     #    remakeCC("lost", i)
