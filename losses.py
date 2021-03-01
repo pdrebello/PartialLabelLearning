@@ -110,9 +110,12 @@ def sample_reward_function(p, q, a, mask):
     #q_logsig = torch.log_sigmoid(q)
     
     rew = (a*p_soft*mask).sum(dim=1) + ((1-a)*(1-p_soft)*mask).sum(dim=1)
-    lap = a*log_sigmoid(q) + (1-a)*mask*(log_sigmoid(-q))
+    #Pdb().set_trace()
+    lap = (a*log_sigmoid(q) + (1-a)*(log_sigmoid(-q)))
+    lap = lap.masked_fill(mask==0,0).sum(dim=1)
+    #lap = lap
     #lap = a*log_sigmoid(q) + (1-a)*mask*(-q + log_sigmoid(q))
-    lap = lap.sum(dim=1)
+    #lap = lap
     
     return -torch.mean(rew * lap)
 

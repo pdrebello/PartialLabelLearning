@@ -7,6 +7,7 @@ import scipy.io
 from dataset import Dataset, loadTrain
 from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 #from losses import *
+from losses import log_sigmoid
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
 from IPython.core.debugger import Pdb
@@ -407,7 +408,7 @@ def main():
                     overall_strategy += pretrain_p_perc
             if(pretrain_q):
                 overall_strategy += "_Q"
-            
+            print(overall_strategy)
             dataset_technique_path = os.path.join(filename, model, overall_strategy, str(fold_no))
             
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
