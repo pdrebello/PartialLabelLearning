@@ -72,7 +72,7 @@ class Phi_Net(nn.Module):
         x = F.elu(self.bn1(self.fc1(x)))
         x = F.elu(self.bn2(self.fc2(x)))
         x = self.fc3(x)
-        x[~mask] = epsilon
+        x[~mask] = -float('inf') + epsilon
         #if(rl_technique == "sample"):
         #    x = F.sigmoid(x)
         #else:

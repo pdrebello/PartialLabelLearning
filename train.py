@@ -5,8 +5,9 @@ import torch.nn.functional as F
 
 import scipy.io
 from dataset import Dataset, loadTrain
-from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+from losses import cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 #from losses import *
+from losses import log_sigmoid
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 import sys
 from IPython.core.debugger import Pdb
@@ -59,7 +60,7 @@ set_random_seeds(1)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train(epoch, train_loader, loss_function, p_net, p_optimizer):
+def train(epoch, train_loader, loss_function, p_net, p_optimizer, M = None):
     p_net.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         
@@ -69,7 +70,10 @@ def train(epoch, train_loader, loss_function, p_net, p_optimizer):
         #Pdb().set_trace() 
         output = p_net(data)
         
-        loss = loss_function(output, target)
+        if(M is not None):
+            loss = loss_function(output, target, M)
+        else:
+            loss = loss_function(output, target)
         #loss_cc_stable = cc_loss_stable(output, target)
         #loss = cc_loss(output, target)
         #loss_cc_stable = cc_loss_stable(output, target)
@@ -223,7 +227,37 @@ def getPretrainPEpochs(thr, logfile):
     pretrain_till = dat['epoch'][dat['surrogate_val_acc']/best_val >= thr].iloc[0]
     return pretrain_till
 
-
+def computeM(train_loader, output_dim, p_net):
+    #return torch.zeros((output_dim,output_dim))
+    M = torch.zeros((output_dim,output_dim))
+    den = torch.zeros(output_dim)
+    p_net.eval()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        
+        data, target = data.to(device), target.to(device)
+        with torch.no_grad():
+            predict = torch.softmax(p_net.forward(data), dim=1)
+            idx = torch.argmax(predict, dim=-1)
+            pred = torch.zeros( predict.shape )
+            pred[np.arange(predict.shape[0]), idx] = 1
+            
+            #pred[maxx] = 1
+            
+            
+        for i in range(output_dim):
+            for j in range(output_dim):
+                M[i][j] += (pred[:,i]*target[:,j]).sum()
+        den += pred.sum(dim = 0)
+    #Pdb().set_trace()
+    for i in range(output_dim):
+        for j in range(output_dim):
+            M[i][j] = torch.log((M[i][j]+epsilon)/(den[i]+output_dim*epsilon))
+    
+    
+    
+    return M
+    
+    
 def main():
     
     dump_dir = argument.dump_dir
@@ -342,6 +376,8 @@ def main():
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
                 real_val_acc = p_accuracy(real_val_loader, p_net)
+                print(real_val_acc)
+                
                 #print(surrogate_val_acc)
                 #print(real_val_acc)
                 
@@ -387,7 +423,89 @@ def main():
                 for log in logs:
                     json.dump(log, file)
                     file.write("\n")
+        elif((technique == "weighted_cc_loss")):
+            dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
             
+            if(technique == "weighted_cc_loss"):
+                loss_function = weighted_cc_loss
+            #train_loader = real_train_loader
+            #test_loader = real_test_loader
+            #val_loader = real_val_loader
+            M = torch.zeros((output_dim,output_dim))
+            #M = computeM(train_loader, output_dim)  
+            #M = np.identity(output_dim)
+            #Pdb().set_trace()
+            set_random_seeds(1) 
+            if(model == "1layer"):
+                p_net = Prediction_Net_Linear(input_dim, output_dim)
+            else:
+                p_net = Prediction_Net(input_dim, output_dim)
+                
+            p_net.to(device)
+            p_optimizer = optimizer(p_net.parameters())
+            
+            
+            
+            result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
+            result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
+            train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth") 
+            
+            best_val = 0
+            best_val_epoch = -1
+            for epoch in range(1,n_epochs+1):
+                train(epoch, train_loader, loss_function, p_net, p_optimizer, M)
+                surrogate_train_acc = p_accuracy(train_loader, p_net)
+                real_train_acc = p_accuracy(real_train_loader, p_net)
+                surrogate_val_acc = p_accuracy(val_loader, p_net)
+                real_val_acc = p_accuracy(real_val_loader, p_net)
+                M = computeM(train_loader, output_dim, p_net)  
+                print(surrogate_train_acc)
+                print(real_val_acc)
+                #print(surrogate_val_acc)
+                #print(real_val_acc)
+                
+                log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
+                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_test_acc': None, 'real_test_acc': None, 
+                           'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
+                           'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
+                           'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                           'info': dataset_technique_path}
+                logs.append(log)
+                if(surrogate_val_acc > best_val):
+                    best_val = surrogate_val_acc
+                    best_val_epoch = epoch
+                    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
+                #if(epoch < 20):
+                #    checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_"+str(epoch)+".pth") 
+                #    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, checkpoint)
+            
+            checkpoint = torch.load(train_checkpoint)
+            p_net.load_state_dict(checkpoint['p_net_state_dict'])
+            surrogate_train_acc = p_accuracy(train_loader, p_net)
+            real_train_acc = p_accuracy(real_train_loader, p_net)
+            surrogate_val_acc = p_accuracy(val_loader, p_net)
+            real_val_acc = p_accuracy(real_val_loader, p_net)
+            surrogate_test_acc = p_accuracy(test_loader, p_net)
+            real_test_acc = p_accuracy(real_test_loader, p_net)
+            
+            
+            log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'test', 
+                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
+                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_test_acc': surrogate_test_acc, 'real_test_acc': real_test_acc, 
+                           'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
+                           'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
+                           'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
+                           'info': dataset_technique_path}
+            logs.append(log)
+            
+            os.makedirs(os.path.dirname(result_log_filename_json), exist_ok=True)
+            with open(result_log_filename_json, "w") as file:
+                for log in logs:
+                    json.dump(log, file)
+                    file.write("\n")
         elif((technique == "linear_rl") or (technique == "exponential_rl")):    
             loss_function = cc_loss
             
@@ -407,7 +525,7 @@ def main():
                     overall_strategy += pretrain_p_perc
             if(pretrain_q):
                 overall_strategy += "_Q"
-            
+            print(overall_strategy)
             dataset_technique_path = os.path.join(filename, model, overall_strategy, str(fold_no))
             
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")

@@ -23,6 +23,29 @@ def old_iexplr_loss(output, target):
     loss = (prob[mask]*torch.log(output[mask])/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
     return -loss
 
+def weighted_cc_loss(output, target, M):
+    pYxy = torch.zeros_like(output)
+    for k in range(output.shape[0]):
+        #Pdb().set_trace()
+        #pyx = output[k]
+        
+        tar = target[k]
+        in_set = (tar == 1).nonzero().flatten()
+        for i in in_set:
+            pYxy[k][i.item()] = 1
+            for j in in_set:
+                pYxy[k][i] = pYxy[k][i] + M[i.item()][j.item()]
+        #output[k] = output[k]
+     
+    log_target_prob = F.log_softmax(output, dim = 1) + pYxy
+    log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+    
+    exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+    summ = (target*torch.exp(exp_argument)).sum(dim=1)
+    log_total_prob = log_max_prob + torch.log(summ + epsilon)
+    loss_tensor = (-1.0*log_total_prob).mean(dim=-1)
+    return loss_tensor
+
 
 def cc_loss(output, target):
     log_target_prob = F.log_softmax(output, dim = 1)
@@ -110,9 +133,12 @@ def sample_reward_function(p, q, a, mask):
     #q_logsig = torch.log_sigmoid(q)
     
     rew = (a*p_soft*mask).sum(dim=1) + ((1-a)*(1-p_soft)*mask).sum(dim=1)
-    lap = a*log_sigmoid(q) + (1-a)*mask*(log_sigmoid(-q))
+    #Pdb().set_trace()
+    lap = (a*log_sigmoid(q) + (1-a)*(log_sigmoid(-q)))
+    lap = lap.masked_fill(mask==0,0).sum(dim=1)
+    #lap = lap
     #lap = a*log_sigmoid(q) + (1-a)*mask*(-q + log_sigmoid(q))
-    lap = lap.sum(dim=1)
+    #lap = lap
     
     return -torch.mean(rew * lap)
 
