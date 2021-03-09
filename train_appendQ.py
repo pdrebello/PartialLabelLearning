@@ -25,7 +25,7 @@ import json
 import pandas as pd
 import os
 
-from dataset import Dataset, loadTrain, loadTrainT
+from dataset import Dataset, loadTrain
 from losses import cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
 from train import q_accuracy_Subset
@@ -80,7 +80,7 @@ for filename in datasets:
         except:
             continue
         directories = [x for x in directories if ('rl' in x)]
-        print(directory) 
+        print("Starting: "+directory) 
         for method in directories:
             for fold_no in range(10):
                 
