@@ -277,21 +277,21 @@ def getPretrainPEpochs(thr, logfile):
 
 def computeM(train_loader, output_dim, p_net):
     M = torch.zeros((output_dim,output_dim))
-    M.to(device)
+    #M.to(device)
     
     den = torch.zeros(output_dim)
-    den.to(device)
+    #den.to(device)
     p_net.eval()
     for batch_idx, (data, target) in enumerate(train_loader):
         
-        data, target = data.to(device), target.to(device)
+        #data, target = data.to(device), target.to(device)
         with torch.no_grad():
             predict = torch.softmax(p_net.forward(data), dim=1)
             idx = torch.argmax(predict, dim=-1)
             pred = torch.zeros( predict.shape )
             pred[np.arange(predict.shape[0]), idx] = 1
             
-        pred.to(device) 
+        #pred.to(device) 
         for i in range(output_dim):
             for j in range(output_dim):
                 M[i][j] += (pred[:,i]*target[:,j]).sum()
