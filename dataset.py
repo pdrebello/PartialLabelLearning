@@ -154,7 +154,7 @@ def remakeCC(filename, add_number):
         
 def loadTrain(filename, fold_no, k):  
     
-    with open("datasets/"+filename+".pkl", "rb") as f:
+    with open(filename+".pkl", "rb") as f:
         data = pickle.load(f)
         partials = pickle.load(f)
         target = pickle.load(f)
