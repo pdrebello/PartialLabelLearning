@@ -277,7 +277,10 @@ def getPretrainPEpochs(thr, logfile):
 
 def computeM(train_loader, output_dim, p_net):
     M = torch.zeros((output_dim,output_dim))
+    M.to(device)
+    
     den = torch.zeros(output_dim)
+    den.to(device)
     p_net.eval()
     for batch_idx, (data, target) in enumerate(train_loader):
         
@@ -341,8 +344,8 @@ def main():
         
     
     for filename in datasets:
-        if(filename in ['lost','MSRCv2']):
-            n_epochs = 100
+        if(filename in ['lost']):
+            n_epochs = 1000
         elif(filename in ['BirdSong']):
             n_epochs = 1500
         else:
