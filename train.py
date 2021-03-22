@@ -175,6 +175,7 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         one_hot = torch.zeros((row.size, class_dim))
         one_hot[torch.arange(row.size), row] = 1
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
+        one_hot = one_hot.to(device)
         
         if(method == 'weighted_loss_xy'):
             oh = data.repeat_interleave(class_dim, dim=0)
