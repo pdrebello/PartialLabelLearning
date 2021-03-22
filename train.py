@@ -167,8 +167,9 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         p_optimizer.zero_grad()
         output = p_net(data)
         
-        #Pdb().set_trace()
+        Pdb().set_trace()
         
+        #For each training example, create class_dim repeats
         class_dim = target.shape[1]
         batch = data.shape[0]
         row = np.asarray(list(range(class_dim)))
@@ -183,7 +184,6 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         g_output = g_net(one_hot)
         #print(torch.sigmoid(g_output[0]))
         log_sigmoid = nn.LogSigmoid()
-        
         target_concat = target.repeat_interleave(class_dim, dim=0)
         
         #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
@@ -192,16 +192,16 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         split_g_output = g_output.view(batch, class_dim)
         
+        
+        #cc_loss
         log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
-        
         log_max_prob,max_prob_index = log_target_prob.max(dim=1)
-        
         exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
         summ = (target*torch.exp(exp_argument)).sum(dim=1)
         log_total_prob = log_max_prob + torch.log(summ + epsilon)
         loss = (-1.0*log_total_prob).mean(dim=-1)
         
-        #print(g_net.weight.data.weight)
+        
         
         loss.backward()
         
