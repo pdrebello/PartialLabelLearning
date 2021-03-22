@@ -105,11 +105,11 @@ class G_Net(nn.Module):
         self.x_dim = x_dim
         self.class_dim = class_dim
         self.method = method
-        if(method == 'weighted_loss_y'):
+        if("loss_y" in self.method):
             self.fc1 = nn.Linear(class_dim, class_dim)
             for i in range(self.class_dim):
                 self.fc1.weight[i][i].trainable = False
-        elif(self.method == 'weighted_loss_xy'):
+        elif('loss_xy' in self.method):
             self.fc1 = nn.Linear(self.x_dim + 20, 512)
             self.fc2 = nn.Linear(512, 256)
             self.fc3 = nn.Linear(256, 20)
@@ -126,10 +126,10 @@ class G_Net(nn.Module):
     
     def forward(self, inp):
         #inp is a (batchsize x class_dim) x class_dim Vector
-        if(self.method == 'weighted_loss_y'):
+        if("loss_y" in self.method):
             x = self.fc1(inp)
             return x
-        elif(self.method == 'weighted_loss_xy'):
+        elif('loss_xy' in self.method):
             #Pdb().set_trace()
             x = inp[0]
             y = inp[1].argmax(dim=1)

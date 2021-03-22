@@ -178,7 +178,7 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
         one_hot = one_hot.to(device)
         
-        if(method == 'weighted_loss_xy'):
+        if("loss_xy" in method):
             oh = data.repeat_interleave(class_dim, dim=0)
             one_hot = (oh, one_hot)
         g_output = g_net(one_hot)
@@ -192,14 +192,22 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         split_g_output = g_output.view(batch, class_dim)
         
-        
+        if('iexplr' in method):
+            #prob = torch.softmax(output, dim=1).detach()
+            log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
+            prob = torch.exp(log_prob).detach()
+            target_probs = (prob*target.float()).sum(dim=1)
+            mask = ((target == 1) & (prob > epsilon))
+            loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
+            
+        else:
         #cc_loss
-        log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
-        log_max_prob,max_prob_index = log_target_prob.max(dim=1)
-        exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
-        summ = (target*torch.exp(exp_argument)).sum(dim=1)
-        log_total_prob = log_max_prob + torch.log(summ + epsilon)
-        loss = (-1.0*log_total_prob).mean(dim=-1)
+            log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
+            log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+            exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+            summ = (target*torch.exp(exp_argument)).sum(dim=1)
+            log_total_prob = log_max_prob + torch.log(summ + epsilon)
+            loss = (-1.0*log_total_prob).mean(dim=-1)
         
         
         
@@ -368,7 +376,7 @@ def main():
         
     
     for filename in datasets:
-        if(filename in ['lost']):
+        if(filename in ['lost', 'MSRCv2']):
             n_epochs = 1000
         elif(filename in ['BirdSong']):
             n_epochs = 1500
@@ -483,7 +491,7 @@ def main():
                 for log in logs:
                     json.dump(log, file)
                     file.write("\n")
-        elif((technique == "weighted_loss_y") or (technique == "weighted_loss_xy")):
+        elif("weighted" in technique ):
             dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
             
             p_net = Prediction_Net(input_dim, output_dim)
@@ -496,7 +504,7 @@ def main():
             
             
             g_net = G_Net(input_dim, output_dim, technique)
-            if(technique == "weighted_loss_y"):
+            if("loss_y"  in technique):
                 M = computeM(train_loader, output_dim, p_net) 
                 M = M.to(device)
                 g_net.setWeights(M)
