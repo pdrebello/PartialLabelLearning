@@ -5,10 +5,9 @@ import torch.nn.functional as F
 
 import scipy.io
 from dataset import Dataset, loadTrain
-from losses import cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
-#from losses import *
-from losses import log_sigmoid
-from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net
+from losses import  cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+
+from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net
 import sys
 from IPython.core.debugger import Pdb
 import random
@@ -74,12 +73,6 @@ def train(epoch, train_loader, loss_function, p_net, p_optimizer, M = None):
             loss = loss_function(output, target, M)
         else:
             loss = loss_function(output, target)
-        #loss_cc_stable = cc_loss_stable(output, target)
-        #loss = cc_loss(output, target)
-        #loss_cc_stable = cc_loss_stable(output, target)
-        #print(loss - loss_cc_stable)
-        #if(loss - loss_cc_stable > 0.001):
-        #    Pdb().set_trace()
 
         loss.backward()
         
@@ -141,7 +134,61 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
           print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tReward: {:.6f}'.format(
             epoch, batch_idx * len(data), len(train_loader.dataset),
             100. * batch_idx / len(train_loader), loss.item(), reward.item()))
-          
+
+def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method):
+    p_net.train()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        
+        data, target = data.to(device), target.to(device)
+        p_optimizer.zero_grad()
+        output = p_net(data)
+        
+        #Pdb().set_trace()
+        
+        class_dim = target.shape[1]
+        batch = data.shape[0]
+        row = np.asarray(list(range(class_dim)))
+        one_hot = torch.zeros((row.size, class_dim))
+        one_hot[torch.arange(row.size), row] = 1
+        one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
+        
+        if(method == 'weighted_loss_xy'):
+            oh = data.repeat_interleave(class_dim, dim=0)
+            one_hot = torch.cat([oh, one_hot], dim=1)
+        g_output = g_net(one_hot)
+        #print(torch.sigmoid(g_output[0]))
+        log_sigmoid = nn.LogSigmoid()
+        
+        target_concat = target.repeat_interleave(class_dim, dim=0)
+        
+        #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+        g_output = log_sigmoid(g_output) * target_concat
+        g_output = g_output.sum(dim=1)
+        
+        split_g_output = g_output.view(batch, class_dim)
+        
+        log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
+        
+        log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+        
+        exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+        summ = (target*torch.exp(exp_argument)).sum(dim=1)
+        log_total_prob = log_max_prob + torch.log(summ + epsilon)
+        loss = (-1.0*log_total_prob).mean(dim=-1)
+        
+        #print(g_net.weight.data.weight)
+        
+        loss.backward()
+        
+        p_optimizer.step()
+        g_optimizer.step()
+        
+        if batch_idx % log_interval == 0:
+          print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            epoch, batch_idx * len(data), len(train_loader.dataset),
+            100. * batch_idx / len(train_loader), loss.item()))
+
+         
 def p_accuracy(test_data, p_net):
     p_net.eval()
     correct = 0
@@ -228,7 +275,6 @@ def getPretrainPEpochs(thr, logfile):
     return pretrain_till
 
 def computeM(train_loader, output_dim, p_net):
-    #return torch.zeros((output_dim,output_dim))
     M = torch.zeros((output_dim,output_dim))
     den = torch.zeros(output_dim)
     p_net.eval()
@@ -241,20 +287,16 @@ def computeM(train_loader, output_dim, p_net):
             pred = torch.zeros( predict.shape )
             pred[np.arange(predict.shape[0]), idx] = 1
             
-            #pred[maxx] = 1
-            
             
         for i in range(output_dim):
             for j in range(output_dim):
                 M[i][j] += (pred[:,i]*target[:,j]).sum()
         den += pred.sum(dim = 0)
-    #Pdb().set_trace()
+    
     for i in range(output_dim):
         for j in range(output_dim):
-            M[i][j] = torch.log((M[i][j]+epsilon)/(den[i]+output_dim*epsilon))
-    
-    
-    
+            M[i][j] = (M[i][j]+epsilon)/(den[i]+output_dim*epsilon)
+    M = torch.log(M/(1-M))
     return M
     
     
@@ -282,14 +324,8 @@ def main():
     pretrain_p_epochs = 3
     pretrain_q_epochs = 50
     
-    #pretrain_p_epochs = 1
-    #pretrain_q_epochs = 1
-    
-    #Mausam Experiment. Modified datasets
     shuffle_name = argument.shuffle
     
-    #if(shuffle_name is not None):
-    #    append_tag = append_tag + "_" + shuffle_name
         
     loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
     
@@ -305,7 +341,7 @@ def main():
     
     for filename in datasets:
         if(filename in ['lost','MSRCv2']):
-            n_epochs = 1000
+            n_epochs = 100
         elif(filename in ['BirdSong']):
             n_epochs = 1500
         else:
@@ -378,8 +414,6 @@ def main():
                 real_val_acc = p_accuracy(real_val_loader, p_net)
                 print(real_val_acc)
                 
-                #print(surrogate_val_acc)
-                #print(real_val_acc)
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
@@ -394,9 +428,7 @@ def main():
                     best_val = surrogate_val_acc
                     best_val_epoch = epoch
                     save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
-                #if(epoch < 20):
-                #    checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_"+str(epoch)+".pth") 
-                #    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, checkpoint)
+                
             
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
@@ -423,28 +455,24 @@ def main():
                 for log in logs:
                     json.dump(log, file)
                     file.write("\n")
-        elif((technique == "weighted_cc_loss")):
+        elif((technique == "weighted_loss_y") or (technique == "weighted_loss_xy")):
             dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
             
-            if(technique == "weighted_cc_loss"):
-                loss_function = weighted_cc_loss
-            #train_loader = real_train_loader
-            #test_loader = real_test_loader
-            #val_loader = real_val_loader
-            M = torch.zeros((output_dim,output_dim))
-            #M = computeM(train_loader, output_dim)  
-            #M = np.identity(output_dim)
-            #Pdb().set_trace()
-            set_random_seeds(1) 
-            if(model == "1layer"):
-                p_net = Prediction_Net_Linear(input_dim, output_dim)
-            else:
-                p_net = Prediction_Net(input_dim, output_dim)
-                
+            p_net = Prediction_Net(input_dim, output_dim)
             p_net.to(device)
             p_optimizer = optimizer(p_net.parameters())
+            dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
+            train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
+            checkpoint = torch.load(train_checkpoint)
+            p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
             
+            g_net = G_Net(input_dim, output_dim, technique)
+            if(technique == "weighted_loss_y"):
+                M = computeM(train_loader, output_dim, p_net) 
+                g_net.setWeights(M)
+            g_net.to(device)
+            g_optimizer = optimizer(g_net.parameters())
             
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
             result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
@@ -453,16 +481,14 @@ def main():
             best_val = 0
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
-                train(epoch, train_loader, loss_function, p_net, p_optimizer, M)
+                weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique)
                 surrogate_train_acc = p_accuracy(train_loader, p_net)
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
                 real_val_acc = p_accuracy(real_val_loader, p_net)
-                M = computeM(train_loader, output_dim, p_net)  
+                
                 print(surrogate_train_acc)
                 print(real_val_acc)
-                #print(surrogate_val_acc)
-                #print(real_val_acc)
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
                            'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
@@ -477,9 +503,7 @@ def main():
                     best_val = surrogate_val_acc
                     best_val_epoch = epoch
                     save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
-                #if(epoch < 20):
-                #    checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_"+str(epoch)+".pth") 
-                #    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, checkpoint)
+               
             
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
@@ -506,6 +530,9 @@ def main():
                 for log in logs:
                     json.dump(log, file)
                     file.write("\n")
+                    
+                    
+                    
         elif((technique == "linear_rl") or (technique == "exponential_rl")):    
             loss_function = cc_loss
             
