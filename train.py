@@ -160,7 +160,6 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         #Pdb().set_trace()
         
-        one_hot
         one_hot = one_hot.to(device)
         g_output = g_net(one_hot)
         #print(torch.sigmoid(g_output[0]))
