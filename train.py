@@ -167,7 +167,7 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         p_optimizer.zero_grad()
         output = p_net(data)
         
-        Pdb().set_trace()
+        #Pdb().set_trace()
         
         #For each training example, create class_dim repeats
         class_dim = target.shape[1]
@@ -180,7 +180,7 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         if(method == 'weighted_loss_xy'):
             oh = data.repeat_interleave(class_dim, dim=0)
-            one_hot = torch.cat([oh, one_hot], dim=1)
+            one_hot = (oh, one_hot)
         g_output = g_net(one_hot)
         #print(torch.sigmoid(g_output[0]))
         log_sigmoid = nn.LogSigmoid()
