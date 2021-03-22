@@ -474,7 +474,7 @@ def main():
             g_net = G_Net(input_dim, output_dim, technique)
             if(technique == "weighted_loss_y"):
                 M = computeM(train_loader, output_dim, p_net) 
-                M.to(device)
+                M = M.to(device)
                 g_net.setWeights(M)
             g_net.to(device)
             g_optimizer = optimizer(g_net.parameters())
