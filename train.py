@@ -145,11 +145,14 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         row = np.asarray(list(range(class_dim)))
         one_hot = np.zeros((row.size, class_dim))
         one_hot[torch.arange(row.size), row] = 1
-        one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
+        #one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
+        one_hot = np.broadcast_to(one_hot, (batch, class_dim, class_dim)).reshape(batch*class_dim, class_dim)
         
         if(method == 'weighted_loss_xy'):
-            oh = data.repeat_interleave(class_dim, dim=0)
-            one_hot = torch.cat([oh, one_hot], dim=1)
+            oh = data.numpy().repeat(class_dim, axis=0)
+            one_hot = torch.cat([torch.from_numpy(oh), torch.from_numpy(one_hot)], dim=1).float()
+        
+        target_concat = torch.from_numpy(target.numpy().repeat(class_dim, axis=0)).float()
         
         data, target = data.to(device), target.to(device)
         p_optimizer.zero_grad()
@@ -157,13 +160,13 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         #Pdb().set_trace()
         
-        
+        one_hot
         one_hot = one_hot.to(device)
         g_output = g_net(one_hot)
         #print(torch.sigmoid(g_output[0]))
         log_sigmoid = nn.LogSigmoid()
-        torch.repeat_interleave()
-        target_concat = target.repeat_interleave(class_dim, dim=0)
+        
+        
         
         #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
         g_output = log_sigmoid(g_output) * target_concat
