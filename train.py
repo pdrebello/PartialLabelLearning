@@ -291,7 +291,7 @@ def computeM(train_loader, output_dim, p_net):
             pred = torch.zeros( predict.shape )
             pred[np.arange(predict.shape[0]), idx] = 1
             
-            
+        pred.to(device) 
         for i in range(output_dim):
             for j in range(output_dim):
                 M[i][j] += (pred[:,i]*target[:,j]).sum()
