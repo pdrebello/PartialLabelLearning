@@ -154,7 +154,7 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         else:
             one_hot = torch.from_numpy(one_hot).float()
         target_concat = torch.from_numpy(target.numpy().repeat(class_dim, axis=0)).float()
-        
+        target_concat = target_concat.to(device)
         data, target = data.to(device), target.to(device)
         p_optimizer.zero_grad()
         output = p_net(data)
