@@ -36,6 +36,7 @@ parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network perc
 parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
 parser.add_argument('--optimizer', type=str, help="Optimizer: default Adam")
 parser.add_argument('--batch_size', type=int, help="batch_size", default = 64)
+parser.add_argument('--dataset_folder', type=str, help="dataset_folder")
 argument = parser.parse_args()
    
 
@@ -304,7 +305,7 @@ def main():
     
     dump_dir = argument.dump_dir
     filename = argument.dataset
-    
+    dataset_folder = argument.dataset_folder
     datasets = argument.datasets
     datasets = [str(item) for item in datasets.split(',')]
     fold_no = argument.fold_no
@@ -349,7 +350,7 @@ def main():
         #n_epochs = 2
         if(shuffle_name is not None):
             filename = filename +"_"+shuffle_name
-        train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(filename+".mat", fold_no, k)
+        train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(os.path.join(dataset_folder,filename+".mat"), fold_no, k)
         
         train_loader = torch.utils.data.DataLoader(train_dataset,
           batch_size=batch_size_train, shuffle=False)
