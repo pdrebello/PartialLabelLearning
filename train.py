@@ -140,27 +140,29 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
     p_net.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         
-        data, target = data.to(device), target.to(device)
-        p_optimizer.zero_grad()
-        output = p_net(data)
-        
-        #Pdb().set_trace()
-        
         class_dim = target.shape[1]
         batch = data.shape[0]
         row = np.asarray(list(range(class_dim)))
-        one_hot = torch.zeros((row.size, class_dim))
+        one_hot = np.zeros((row.size, class_dim))
         one_hot[torch.arange(row.size), row] = 1
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
         
         if(method == 'weighted_loss_xy'):
             oh = data.repeat_interleave(class_dim, dim=0)
             one_hot = torch.cat([oh, one_hot], dim=1)
+        
+        data, target = data.to(device), target.to(device)
+        p_optimizer.zero_grad()
+        output = p_net(data)
+        
+        #Pdb().set_trace()
+        
+        
         one_hot = one_hot.to(device)
         g_output = g_net(one_hot)
         #print(torch.sigmoid(g_output[0]))
         log_sigmoid = nn.LogSigmoid()
-        
+        torch.repeat_interleave()
         target_concat = target.repeat_interleave(class_dim, dim=0)
         
         #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
