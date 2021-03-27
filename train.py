@@ -538,10 +538,10 @@ def main():
             p_net = Prediction_Net(input_dim, output_dim)
             p_net.to(device)
             p_optimizer = optimizer(p_net.parameters())
-            #dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
-            #train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
-            #checkpoint = torch.load(train_checkpoint)
-            #p_net.load_state_dict(checkpoint['p_net_state_dict'])
+            dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
+            train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
+            checkpoint = torch.load(train_checkpoint)
+            p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
             if("tie" in technique):
                 print("Here")
