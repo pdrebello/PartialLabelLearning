@@ -7,7 +7,7 @@ import scipy.io
 from dataset import Dataset, loadTrain
 from losses import  cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 
-from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net
+from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net, G_Net_Tie
 import sys
 from IPython.core.debugger import Pdb
 import random
@@ -37,6 +37,8 @@ parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
 parser.add_argument('--optimizer', type=str, help="Optimizer: default Adam")
 parser.add_argument('--batch_size', type=int, help="batch_size", default = 64)
 parser.add_argument('--dataset_folder', type=str, help="dataset_folder")
+
+parser.add_argument('--tie', default=0,type=int, help="tie embedding weights")
 argument = parser.parse_args()
    
 
@@ -138,6 +140,13 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
 
 def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method):
     p_net.train()
+    
+    class_dim = train_loader[0][1].shape[1]
+    row = np.asarray(list(range(class_dim)))
+    one_hot_gpu = torch.zeros((row.size, class_dim))
+    one_hot_gpu = one_hot_gpu.to(device)
+    one_hot[torch.arange(row.size), row] = 1
+    
     for batch_idx, (data, target) in enumerate(train_loader):
         
         """
@@ -170,19 +179,51 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         #Pdb().set_trace()
         
         #For each training example, create class_dim repeats
-        class_dim = target.shape[1]
+        
         batch = data.shape[0]
-        row = np.asarray(list(range(class_dim)))
-        one_hot = torch.zeros((row.size, class_dim))
-        one_hot[torch.arange(row.size), row] = 1
+        
+        
+        one_hot = one_hot_gpu
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
-        one_hot = one_hot.to(device)
+        #one_hot = one_hot.to(device)
+        if("full" in method):
+            if("loss_xy" in method):
+                oh = data.repeat_interleave(class_dim, dim=0)
+                one_hot = (oh, one_hot)
+            g_output = g_net(one_hot)
+            
+            log_sigmoid = nn.LogSigmoid()
+            target_concat = target.repeat_interleave(class_dim, dim=0)
+            
+            #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+            g_output = log_sigmoid(g_output) * target_concat
+            g_output = g_output.sum(dim=1)
+            
+            split_g_output = g_output.view(batch, class_dim)
+            
+            if('iexplr' in method):
+                #prob = torch.softmax(output, dim=1).detach()
+                log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
+                prob = torch.exp(log_prob).detach()
+                target_probs = (prob*target.float()).sum(dim=1)
+                mask = ((target == 1) & (prob > epsilon))
+                loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
+                
+            else:
+            #cc_loss
+                log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
+                log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+                exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+                summ = (target*torch.exp(exp_argument)).sum(dim=1)
+                log_total_prob = log_max_prob + torch.log(summ + epsilon)
+                loss = (-1.0*log_total_prob).mean(dim=-1)
+        
         
         if("loss_xy" in method):
             oh = data.repeat_interleave(class_dim, dim=0)
             one_hot = (oh, one_hot)
         g_output = g_net(one_hot)
-        #print(torch.sigmoid(g_output[0]))
+        
         log_sigmoid = nn.LogSigmoid()
         target_concat = target.repeat_interleave(class_dim, dim=0)
         
@@ -502,8 +543,10 @@ def main():
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
-            
-            g_net = G_Net(input_dim, output_dim, technique)
+            if("tie" in technique):
+                g_net = G_Net_Tie(input_dim, output_dim, technique)
+            else:
+                g_net = G_Net(input_dim, output_dim, technique)
             if("loss_y"  in technique):
                 M = computeM(train_loader, output_dim, p_net) 
                 M = M.to(device)

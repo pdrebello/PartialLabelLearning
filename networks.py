@@ -145,8 +145,95 @@ class G_Net(nn.Module):
         self.fc1.weight.data = M
     
     
+class G_Net_Tie(nn.Module):
+    def __init__(self, x_dim, class_dim, method):
+        super(G_Net_Tie, self).__init__()
+        self.x_dim = x_dim
+        self.class_dim = class_dim
+        self.method = method
+        if("loss_y" in self.method):
+            self.fc1 = nn.Linear(class_dim, class_dim)
+            for i in range(self.class_dim):
+                self.fc1.weight[i][i].trainable = False
+        elif('loss_xy' in self.method):
+            self.fc1 = nn.Linear(self.x_dim + 50, 128)
+            self.fc2 = nn.Linear(128, 50)
+            self.fc3 = nn.Linear(50, 50)
+            #self.fc4 = nn.Linear(50, self.class_dim)
+            self.bn1 = nn.BatchNorm1d(128)
+            self.bn2 = nn.BatchNorm1d(50)
+            self.bn3 = nn.BatchNorm1d(50)
+            self.embedding = torch.nn.Embedding(self.class_dim, 50)
+            torch.nn.init.xavier_uniform(self.fc1.weight)
+            torch.nn.init.xavier_uniform(self.fc2.weight)
+            torch.nn.init.xavier_uniform(self.fc3.weight)
+            
     
+    def forward(self, inp):
+        #inp is a (batchsize x class_dim) x class_dim Vector
+        if("loss_y" in self.method):
+            x = self.fc1(inp)
+            return x
+        elif('loss_xy' in self.method):
+            #Pdb().set_trace()
+            x = inp[0]
+            y = inp[1].argmax(dim=1)
+            y = self.embedding(y)
+            x = torch.cat([x, y], dim=1)
+            x = F.elu(self.bn1(self.fc1(x)))
+            x = F.elu(self.bn2(self.fc2(x)))
+            x = F.elu(self.bn3(self.fc3(x)))
+            #print("Tying")
+            x = torch.nn.functional.linear(x, self.embedding.weight)
+            #x = self.fc4(x)
+            return x
+            
+    def setWeights(self, M):
+        self.fc1.weight.data = M
     
+class G_Net_Full(nn.Module):
+    def __init__(self, x_dim, class_dim, method):
+        super(G_Net_Tie, self).__init__()
+        self.x_dim = x_dim
+        self.class_dim = class_dim
+        self.method = method
+        if("loss_y" in self.method):
+            self.fc1 = nn.Linear(class_dim, class_dim)
+            for i in range(self.class_dim):
+                self.fc1.weight[i][i].trainable = False
+        elif('loss_xy' in self.method):
+            self.fc1 = nn.Linear(self.x_dim + 100, 128)
+            self.fc2 = nn.Linear(128, 50)
+            self.fc3 = nn.Linear(50, 50)
+            self.fc4 = nn.Linear(50, 1)
+            self.bn1 = nn.BatchNorm1d(128)
+            self.bn2 = nn.BatchNorm1d(50)
+            self.bn3 = nn.BatchNorm1d(50)
+            
+            self.embedding = torch.nn.Embedding(self.class_dim, 50)
+            torch.nn.init.xavier_uniform(self.fc1.weight)
+            torch.nn.init.xavier_uniform(self.fc2.weight)
+            torch.nn.init.xavier_uniform(self.fc3.weight)
+            torch.nn.init.xavier_uniform(self.fc4.weight)
+            
+    
+    def forward(self, inp):
+        #inp is a (batchsize x class_dim) x class_dim Vector
+        if("loss_y" in self.method):
+            x = self.fc1(inp)
+            return x
+        elif('loss_xy' in self.method):
+            x = inp[0]
+            y = inp[1].argmax(dim=1)
+            y = self.embedding(y)
+            y_dash = inp[2].argmax(dim=1)
+            y_dash = self.embedding(y_dash)
+            x = torch.cat([x, y, y_dash], dim=1)
+            x = F.elu(self.bn1(self.fc1(x)))
+            x = F.elu(self.bn2(self.fc2(x)))
+            x = F.elu(self.bn3(self.fc3(x)))
+            x = self.fc4(x)
+            return x
     
     
     
