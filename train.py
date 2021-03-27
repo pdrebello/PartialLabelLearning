@@ -138,14 +138,14 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
             epoch, batch_idx * len(data), len(train_loader.dataset),
             100. * batch_idx / len(train_loader), loss.item(), reward.item()))
 
-def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method):
+def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method, class_dim):
     p_net.train()
     
-    class_dim = train_loader[0][1].shape[1]
+    #class_dim = train_loader.__getitem__(0)[1].shape[1]
     row = np.asarray(list(range(class_dim)))
     one_hot_gpu = torch.zeros((row.size, class_dim))
     one_hot_gpu = one_hot_gpu.to(device)
-    one_hot[torch.arange(row.size), row] = 1
+    one_hot_gpu[torch.arange(row.size), row] = 1
     
     for batch_idx, (data, target) in enumerate(train_loader):
         
@@ -538,12 +538,13 @@ def main():
             p_net = Prediction_Net(input_dim, output_dim)
             p_net.to(device)
             p_optimizer = optimizer(p_net.parameters())
-            dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
-            train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
-            checkpoint = torch.load(train_checkpoint)
-            p_net.load_state_dict(checkpoint['p_net_state_dict'])
+            #dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
+            #train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
+            #checkpoint = torch.load(train_checkpoint)
+            #p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
             if("tie" in technique):
+                print("Here")
                 g_net = G_Net_Tie(input_dim, output_dim, technique)
             else:
                 g_net = G_Net(input_dim, output_dim, technique)
@@ -561,7 +562,7 @@ def main():
             best_val = 0
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
-                weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique)
+                weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
                 surrogate_train_acc = p_accuracy(train_loader, p_net)
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
