@@ -193,7 +193,7 @@ class G_Net_Tie(nn.Module):
     
 class G_Net_Full(nn.Module):
     def __init__(self, x_dim, class_dim, method):
-        super(G_Net_Tie, self).__init__()
+        super(G_Net_Full, self).__init__()
         self.x_dim = x_dim
         self.class_dim = class_dim
         self.method = method
@@ -223,10 +223,13 @@ class G_Net_Full(nn.Module):
             x = self.fc1(inp)
             return x
         elif('loss_xy' in self.method):
+            #Pdb().set_trace()
             x = inp[0]
-            y = inp[1].argmax(dim=1)
+            y = inp[1][:,0]
+            y_dash = inp[1][:,1]
+            #y = y.argmax(dim=1)
             y = self.embedding(y)
-            y_dash = inp[2].argmax(dim=1)
+            #y_dash = y_dash.argmax(dim=1)
             y_dash = self.embedding(y_dash)
             x = torch.cat([x, y, y_dash], dim=1)
             x = F.elu(self.bn1(self.fc1(x)))

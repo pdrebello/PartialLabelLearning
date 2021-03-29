@@ -7,7 +7,7 @@ import scipy.io
 from dataset import Dataset, loadTrain
 from losses import  cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
 
-from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net, G_Net_Tie
+from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net, G_Net_Tie, G_Net_Full
 import sys
 from IPython.core.debugger import Pdb
 import random
@@ -138,6 +138,79 @@ def rl_train(epoch, train_loader, rl_technique, p_net, p_optimizer, s_net, s_opt
             epoch, batch_idx * len(data), len(train_loader.dataset),
             100. * batch_idx / len(train_loader), loss.item(), reward.item()))
 
+def weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method, class_dim):
+    p_net.train()
+    
+    #class_dim = train_loader.__getitem__(0)[1].shape[1]
+    row = np.asarray(list(range(class_dim)))
+    #one_hot_gpu = torch.zeros((class_dim*class_dim, class_dim+class_dim))
+    #one_hot_gpu = one_hot_gpu.to(device)
+    
+    y_gold = torch.arange(row.size)
+    y_dash = torch.cat(class_dim*[y_gold])
+    y_gold = y_gold.repeat_interleave(class_dim, dim=0)
+    one_hot_gpu = torch.stack([y_gold, y_dash], dim=1)
+    one_hot_gpu = one_hot_gpu.to(device)
+    #one_hot_gpu[torch.arange(one_hot_gpu.shape[0]), y_gold] = 1
+    #one_hot_gpu[torch.arange(one_hot_gpu.shape[0]), y_dash + class_dim] = 1
+    
+    for batch_idx, (data, target) in enumerate(train_loader):
+        
+        data, target = data.to(device), target.to(device)
+        p_optimizer.zero_grad()
+        output = p_net(data)
+        
+    
+        batch = data.shape[0]
+        
+        
+        one_hot = one_hot_gpu
+        one_hot = one_hot.expand(batch, class_dim*class_dim, 2).reshape(batch*class_dim*class_dim, 2)
+        #one_hot = one_hot.to(device)
+        
+        if("loss_xy" in method):
+            oh = data.repeat_interleave(class_dim *class_dim, dim=0)
+            one_hot = (oh, one_hot)
+        g_output = g_net(one_hot)
+        g_output = g_output.view(batch*class_dim, class_dim)
+        log_sigmoid = nn.LogSigmoid()
+        target_concat = target.repeat_interleave(class_dim, dim=0)
+        #Pdb().set_trace()
+        #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+        g_output = log_sigmoid(g_output) * target_concat
+        g_output = g_output.sum(dim=1)
+        
+        split_g_output = g_output.view(batch, class_dim)
+        
+        if('iexplr' in method):
+            #prob = torch.softmax(output, dim=1).detach()
+            log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
+            prob = torch.exp(log_prob).detach()
+            target_probs = (prob*target.float()).sum(dim=1)
+            mask = ((target == 1) & (prob > epsilon))
+            loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
+            
+        else:
+        #cc_loss
+            log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
+            log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+            exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+            summ = (target*torch.exp(exp_argument)).sum(dim=1)
+            log_total_prob = log_max_prob + torch.log(summ + epsilon)
+            loss = (-1.0*log_total_prob).mean(dim=-1)
+        
+        
+        
+        loss.backward()
+        
+        p_optimizer.step()
+        g_optimizer.step()
+        
+        if batch_idx % log_interval == 0:
+          print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            epoch, batch_idx * len(data), len(train_loader.dataset),
+            100. * batch_idx / len(train_loader), loss.item()))
+
 def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method, class_dim):
     p_net.train()
     
@@ -186,38 +259,6 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         one_hot = one_hot_gpu
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
         #one_hot = one_hot.to(device)
-        if("full" in method):
-            if("loss_xy" in method):
-                oh = data.repeat_interleave(class_dim, dim=0)
-                one_hot = (oh, one_hot)
-            g_output = g_net(one_hot)
-            
-            log_sigmoid = nn.LogSigmoid()
-            target_concat = target.repeat_interleave(class_dim, dim=0)
-            
-            #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
-            g_output = log_sigmoid(g_output) * target_concat
-            g_output = g_output.sum(dim=1)
-            
-            split_g_output = g_output.view(batch, class_dim)
-            
-            if('iexplr' in method):
-                #prob = torch.softmax(output, dim=1).detach()
-                log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
-                prob = torch.exp(log_prob).detach()
-                target_probs = (prob*target.float()).sum(dim=1)
-                mask = ((target == 1) & (prob > epsilon))
-                loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
-                
-            else:
-            #cc_loss
-                log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
-                log_max_prob,max_prob_index = log_target_prob.max(dim=1)
-                exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
-                summ = (target*torch.exp(exp_argument)).sum(dim=1)
-                log_total_prob = log_max_prob + torch.log(summ + epsilon)
-                loss = (-1.0*log_total_prob).mean(dim=-1)
-        
         
         if("loss_xy" in method):
             oh = data.repeat_interleave(class_dim, dim=0)
@@ -543,7 +584,9 @@ def main():
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
-            if("tie" in technique):
+            if("full" in technique):
+                g_net = G_Net_Full(input_dim, output_dim, technique)
+            elif("tie" in technique):
                 print("Here")
                 g_net = G_Net_Tie(input_dim, output_dim, technique)
             else:
@@ -562,7 +605,11 @@ def main():
             best_val = 0
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
-                weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
+                if('full' in technique):
+                    weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
+                else:
+                    weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
+                
                 surrogate_train_acc = p_accuracy(train_loader, p_net)
                 real_train_acc = p_accuracy(real_train_loader, p_net)
                 surrogate_val_acc = p_accuracy(val_loader, p_net)
