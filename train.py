@@ -446,7 +446,7 @@ def q_accuracy_Subset(real_test_data, partial_test_data, q_net, rl_technique):
     return (100. * float(correct) / len(real_test_data.dataset))
     #return 0
 
-def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, filename):
+def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, filename, g_net = None, g_optimizer = None):
     if(s_net is None):
         checkpoint = {
             'epoch': epoch,
@@ -455,6 +455,8 @@ def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, file
             'p_optimizer': p_optimizer.state_dict(),
             's_net_state_dict': None,
             's_optimizer': None,
+            'g_optimizer': g_optimizer,
+            'g_net':g_net
         }
     else:
         checkpoint = {
@@ -464,6 +466,8 @@ def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, file
             'p_optimizer': p_optimizer.state_dict(),
             's_net_state_dict': s_net.phi_net.state_dict(),
             's_optimizer': s_optimizer.state_dict(),
+            'g_optimizer': g_optimizer,
+            'g_net':g_net
         }
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     torch.save(checkpoint, filename)
@@ -853,7 +857,7 @@ def main():
                 if(((val_metric == 'acc') and (current_val > best_val)) or ((val_metric == 'loss') and (current_val < best_val))):
                     best_val = current_val
                     best_val_epoch = epoch
-                    save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, train_checkpoint)
+                    save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, train_checkpoint, g_net = g_net, g_optimizer = g_optimizer)
             
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
