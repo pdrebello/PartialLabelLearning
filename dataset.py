@@ -317,19 +317,66 @@ def makeMNIST():
         pickle.dump(partials, f)
         pickle.dump(target, f)
         
-        
-def remakeTransition(filename):
+
+def oneTransition(filename):
     with open("datasets/"+filename+".mat.pkl", "rb") as f:
         data = pickle.load(f)
         partials = pickle.load(f)
-        print(partials.sum(axis=1).mean())
-        target = pickle.load(f)
+    labels = partials.shape[1]
     
+    matrix = np.zeros((labels, labels))
+    choices = list(range(labels))
+    for i in range(labels):
+        while True:
+            j = random.choice(choices)
+            if(j!=i):
+                break
+        matrix[i][j] = random.uniform(0.3, 0.7)
+            
+        matrix[i][i] = 1
+        
+    transition = matrix
+    with open("datasets/transition/"+"one_"+filename+".pkl", "wb") as f:
+        pickle.dump(transition, f)
+
+def twoTransition(filename):
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+    labels = partials.shape[1]
+    
+    matrix = np.zeros((labels, labels))
+    choices = list(range(labels))
+    for i in range(labels):
+        while True:
+            j = random.choice(choices)
+            if(j!=i):
+                break
+        matrix[i][j] = random.uniform(0.3, 0.7)
+        
+        while True:
+            j = random.choice(choices)
+            if(j!=i):
+                break
+        matrix[i][j] = random.uniform(0.3, 0.7)
+            
+        matrix[i][i] = 1
+        
+    transition = matrix
+    with open("datasets/transition/"+"two_"+filename+".pkl", "wb") as f:
+        pickle.dump(transition, f)
+        
+def remakeTransition(filename, method):
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+    old_partials = partials.copy()
     partials = np.zeros_like(target)
     labels = partials.shape[1]
     #print(labels)
     #print(partials.shape)
-    with open("datasets/"+"transition2_"+filename+".pkl", "rb") as f:
+    with open("datasets/transition/"+method+"_"+filename+".pkl", "rb") as f:
         transition = pickle.load(f)
         
     for i in range(target.shape[0]):
@@ -340,8 +387,12 @@ def remakeTransition(filename):
             #print(partials.shape)
             if(flip(prob)):
                 partials[i,j] = 1
-    print(partials.sum(axis=1).mean())
-    with open("datasets/"+filename+"_transition2.mat.pkl", "wb") as f:
+    #print(partials.sum(axis=1).mean())
+    print(partials.sum()/target.sum())
+    print(np.multiply(partials,target).sum())
+    print(target.sum())
+    print("\n")
+    with open("datasets/"+filename+"_"+method+".mat.pkl", "wb") as f:
         pickle.dump(data, f)
         pickle.dump(partials, f)
         pickle.dump(target, f)
@@ -358,12 +409,17 @@ def remakeTransition(filename):
 #def MNIST():
     
 
-#def main():
+def main():
+    for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
+        oneTransition(i)
+        twoTransition(i)
+        remakeTransition(i, "one")
+        remakeTransition(i, "two")
 #    MNIST()
     #for i in [4]:
     #    remakeCC("lost", i)
     #train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain("lost_4.mat", 0, 10)
     #print(val_dataset.labels.sum(axis=1))        
-#if __name__ == "__main__":
-#    main() 
+if __name__ == "__main__":
+    main() 
     
