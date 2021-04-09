@@ -42,6 +42,38 @@ class Prediction_Net(nn.Module):
     
     def copy(self, net2):
         self.load_state_dict(net2.state_dict())
+        
+class LeNet5(nn.Module):
+
+    def __init__(self, input_dim, n_classes):
+        super(LeNet5, self).__init__()
+        
+        self.feature_extractor = nn.Sequential(            
+            nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1,padding=2),
+            nn.Tanh(),
+            nn.AvgPool2d(kernel_size=2),
+            nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5, stride=1),
+            nn.Tanh(),
+            nn.AvgPool2d(kernel_size=2),
+            nn.Conv2d(in_channels=16, out_channels=120, kernel_size=5, stride=1),
+            nn.Tanh()
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(in_features=120, out_features=84),
+            nn.Tanh(),
+            nn.Linear(in_features=84, out_features=n_classes),
+        )
+
+
+    def forward(self, x):
+        x = x.unsqueeze(dim=1)
+        x = x.view(x.shape[0], 1, 28, 28)
+        x = self.feature_extractor(x)
+        x = torch.flatten(x, 1)
+        logits = self.classifier(x)
+        #probs = F.softmax(logits, dim=1)
+        return logits
 
 class Phi_Net(nn.Module):
     def __init__(self, input_dim, output_dim, input_x):
@@ -132,7 +164,7 @@ class G_Net(nn.Module):
         elif('loss_xy' in self.method):
             #Pdb().set_trace()
             x = inp[0]
-            y = inp[1].argmax(dim=1)
+            y = inp[1].argmax(dim=1).long()
             y = self.embedding(y)
             x = torch.cat([x, y], dim=1)
             x = F.elu(self.bn1(self.fc1(x)))
@@ -177,7 +209,7 @@ class G_Net_Tie(nn.Module):
         elif('loss_xy' in self.method):
             #Pdb().set_trace()
             x = inp[0]
-            y = inp[1].argmax(dim=1)
+            y = inp[1].argmax(dim=1).long()
             y = self.embedding(y)
             x = torch.cat([x, y], dim=1)
             x = F.elu(self.bn1(self.fc1(x)))
@@ -225,8 +257,8 @@ class G_Net_Full(nn.Module):
         elif('loss_xy' in self.method):
             #Pdb().set_trace()
             x = inp[0]
-            y = inp[1][:,0]
-            y_dash = inp[1][:,1]
+            y = inp[1][:,0].long()
+            y_dash = inp[1][:,1].long()
             #y = y.argmax(dim=1)
             y = self.embedding(y)
             #y_dash = y_dash.argmax(dim=1)
@@ -239,7 +271,48 @@ class G_Net_Full(nn.Module):
             return x
     
     
+class G_Net_Hyperparameter(nn.Module):
+    def __init__(self, x_dim, class_dim, method):
+        super(G_Net_Hyperparameter, self).__init__()
+        self.x_dim = x_dim
+        self.class_dim = class_dim
+        self.method = method
+        if("loss_y" in self.method):
+            self.fc1 = nn.Linear(class_dim, class_dim)
+            for i in range(self.class_dim):
+                self.fc1.weight[i][i].trainable = False
+        elif('loss_xy' in self.method):
+            self.fc1 = nn.Linear(self.x_dim + 20, 512)
+            self.fc2 = nn.Linear(512, 256)
+            self.fc3 = nn.Linear(256, self.class_dim)
+            #self.fc4 = nn.Linear(20, self.class_dim)
+            self.bn1 = nn.BatchNorm1d(512)
+            self.bn2 = nn.BatchNorm1d(256)
+            self.bn3 = nn.BatchNorm1d(20)
+            self.embedding = torch.nn.Embedding(self.class_dim, 20)
+            torch.nn.init.xavier_uniform(self.fc1.weight)
+            torch.nn.init.xavier_uniform(self.fc2.weight)
+            torch.nn.init.xavier_uniform(self.fc3.weight)
+            
     
+    def forward(self, inp):
+        #inp is a (batchsize x class_dim) x class_dim Vector
+        if("loss_y" in self.method):
+            x = self.fc1(inp)
+            return x
+        elif('loss_xy' in self.method):
+            #Pdb().set_trace()
+            x = inp[0]
+            y = inp[1].argmax(dim=1).long()
+            y = self.embedding(y)
+            x = torch.cat([x, y], dim=1)
+            x = F.elu(self.bn1(self.fc1(x)))
+            x = F.elu(self.bn2(self.fc2(x)))
+            x = self.fc3(x)
+            return x
+            
+    def setWeights(self, M):
+        self.fc1.weight.data = M
     
     
     

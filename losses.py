@@ -163,8 +163,33 @@ def old_sample_loss_function(p, q, a, mask):
     loss = torch.log((a*p*mask).sum(dim=1) +epsilon)
     return -0.5*torch.mean(loss)
 
+def hinge_loss(y):
+    return torch.max(torch.zeros_like(y),1-y)
 
+def cour_loss(p, target):
+    #Pdb().set_trace()
+    correct = (p*target).sum(dim=1)
+    normalise = (target).sum(dim=1)
+    left_term = hinge_loss((correct/normalise))
+    
+    right_term = p*(1-target)
+    right_term = hinge_loss(-right_term).sum(dim=1)
+    
+    loss = left_term + right_term
+    return torch.mean(loss)
 
+def svm_loss(p, target):
+    #Pdb().set_trace()
+    correct = (p*target).max(dim=1).values
+    incorrect = (p*(1-target)).max(dim=1).values
+    #normalise = (target).sum(dim=1)
+    #left_term = hinge_loss((correct/normalise))
+    
+    #right_term = p*(1-target)
+    loss = hinge_loss(correct - incorrect).sum()
+    
+    #loss = left_term + right_term
+    return torch.mean(loss)
 
 
 

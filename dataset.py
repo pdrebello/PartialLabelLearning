@@ -8,6 +8,10 @@ import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
+from numpy import genfromtxt
+from IPython.core.debugger import Pdb
+import scipy.stats as stats
+
 
 class Dataset(torch.utils.data.Dataset):
   'Characterizes a dataset for PyTorch'
@@ -158,8 +162,9 @@ def loadTrain(filename, fold_no, k):
         data = pickle.load(f)
         partials = pickle.load(f)
         target = pickle.load(f)
-    data -= np.mean(data, axis=0)
-    data /= np.std(data, axis=0)
+    if(not('MNIST' in filename)):
+        data -= np.mean(data, axis=0)
+        data /= np.std(data, axis=0)
     split = int(data.shape[0]/k)
     
     train_data_list = []
@@ -174,19 +179,32 @@ def loadTrain(filename, fold_no, k):
     val_target_list = []
     val_partials_list = []
     
-    for i in range(k):
-        if(fold_no == i):
-            test_data_list.append(data[i*split : (i+1)*split])
-            test_target_list.append(target[i*split : (i+1)*split])
-            test_partials_list.append(partials[i*split : (i+1)*split])
-        elif(i == (fold_no+1)%k):
-            val_data_list.append(data[i*split : (i+1)*split])
-            val_target_list.append(target[i*split : (i+1)*split])
-            val_partials_list.append(partials[i*split : (i+1)*split])
-        else:
-            train_data_list.append(data[i*split : (i+1)*split])
-            train_target_list.append(target[i*split : (i+1)*split])
-            train_partials_list.append(partials[i*split : (i+1)*split])
+    if('MNIST' in filename):
+        test_data_list.append(data[60000 : 70000])
+        test_target_list.append(target[60000 : 70000])
+        test_partials_list.append(partials[60000 : 70000])
+        
+        val_data_list.append(data[54000: 60000])
+        val_target_list.append(target[54000: 60000])
+        val_partials_list.append(partials[54000: 60000])
+        
+        train_data_list.append(data[0 :54000])
+        train_target_list.append(target[0 :54000])
+        train_partials_list.append(partials[0 :54000])
+    else:
+        for i in range(k):
+            if(fold_no == i):
+                test_data_list.append(data[i*split : (i+1)*split])
+                test_target_list.append(target[i*split : (i+1)*split])
+                test_partials_list.append(partials[i*split : (i+1)*split])
+            elif(i == (fold_no+1)%k):
+                val_data_list.append(data[i*split : (i+1)*split])
+                val_target_list.append(target[i*split : (i+1)*split])
+                val_partials_list.append(partials[i*split : (i+1)*split])
+            else:
+                train_data_list.append(data[i*split : (i+1)*split])
+                train_target_list.append(target[i*split : (i+1)*split])
+                train_partials_list.append(partials[i*split : (i+1)*split])
     
     train_data = np.vstack(train_data_list)
     train_target = np.vstack(train_target_list)
@@ -210,19 +228,142 @@ def loadTrain(filename, fold_no, k):
     #return train_data, test_data
     return train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, data.shape[1], partials.shape[1]
 
-def main():
-    for i in [2,4,8,12,16,20,22]:
-        remakeCC("MSRCv2", i)
-    for i in [2,4,8,16,32,64,128]:
-        remakeCC("Soccer Player", i)
-    for i in [2,4,6,8,10,12,14]:
-        remakeCC("lost", i)
-    for i in [1,2,4,6,8,10,12]:
-        remakeCC("BirdSong", i)
+def makeTransition(filename):
+    """matrix = [[3,7,1,23,43,12,9,34,4,2],
+              [6,4,34,9,12,4,56,4,2,1],
+              [30,6,4,34,2,56,3,1,8,2],
+              [89,34,2,14,24,1,75,89,2,8],
+              [4,4,3,2,4,5,1,2,5,4],
+              [65,34,12,4,76,3,1,23,9,1],
+              [56,1,23,5,34,11,7,34,2,10],
+              [7,90,23,80,32,9,4,1,32,56],
+              [90,54,23,12,5,24,24,90,2,22],
+              [1,2,3,5,2,90,4,2,23,43]]"""
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+    labels = partials.shape[1]
+    lower, upper = 0, 1
+    mu, sigma = 0.5, 0.25
+    X = stats.truncnorm(
+        (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
+    matrix = np.zeros((labels, labels))
+    for i in range(labels):
+        for j in range(labels):
+            x = X.rvs(1)
+            if(x <=0.5):
+                x = 0.5-x
+            else:
+                x = 1-x +0.45
+            if('Soccer' in filename):
+                if(x>0.94):
+                    matrix[i][j] = x/3
+                else:
+                    matrix[i][j] = x/50
+            else:
+                if(x>0.8):
+                    matrix[i][j] = x/2
+                else:
+                    matrix[i][j] = x/10
+    print(matrix.max(axis=1))       
+    for i in range(labels):
+        #m = max(matrix[i])
+        #m = m+np.random.randint(10,30)
+        #for j in range(10):
+        #    matrix[i][j] = matrix[i][j]/float(m)
+        matrix[i][i] = 1
+    transition = matrix
+    with open("datasets/"+"transition2_"+filename+".pkl", "wb") as f:
+        pickle.dump(transition, f)
+
+def flip(p):
+    return(random.random() < p)
+    
+def makeMNIST():
+    train_data = genfromtxt('datasets/mnist_train.csv', delimiter=',')
+    test_data = genfromtxt('datasets/mnist_test.csv', delimiter=',')
+    
+    X_train = train_data[1:,1:]
+    Y_train = train_data[1:,0].astype(int)
+    X_test = test_data[1:, 1:]
+    Y_test = test_data[1:,0].astype(int)
+    
+    
+    Y_train_one = np.zeros((Y_train.shape[0], 10))
+    Y_train_one[np.arange(Y_train.shape[0]),Y_train] = 1
+    
+    Y_test_one = np.zeros((Y_test.shape[0], 10))
+    Y_test_one[np.arange(Y_test.shape[0]),Y_test] = 1
+    
+    
+    data = np.vstack((X_train, X_test))
+    target = np.vstack((Y_train_one, Y_test_one))
+    partials = np.zeros_like(target)
+    
+    with open("datasets/transition.pkl", "rb") as f:
+        transition = pickle.load(f)
+        
+    for i in range(target.shape[0]):
+        #Pdb().set_trace()
+        print(i)
+        correct = int(target[i].argmax())
+        for j in range(10):
+            prob = transition[correct][j]
+            if(flip(prob)):
+                partials[i][j] = 1
+            
+    with open("datasets/"+"MNIST.mat.pkl", "wb") as f:
+        pickle.dump(data, f)
+        pickle.dump(partials, f)
+        pickle.dump(target, f)
+        
+        
+def remakeTransition(filename):
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        print(partials.sum(axis=1).mean())
+        target = pickle.load(f)
+    
+    partials = np.zeros_like(target)
+    labels = partials.shape[1]
+    #print(labels)
+    #print(partials.shape)
+    with open("datasets/"+"transition2_"+filename+".pkl", "rb") as f:
+        transition = pickle.load(f)
+        
+    for i in range(target.shape[0]):
+        #print(i)
+        correct = int(target[i].argmax())
+        for j in range(labels):
+            prob = transition[correct][j]
+            #print(partials.shape)
+            if(flip(prob)):
+                partials[i,j] = 1
+    print(partials.sum(axis=1).mean())
+    with open("datasets/"+filename+"_transition2.mat.pkl", "wb") as f:
+        pickle.dump(data, f)
+        pickle.dump(partials, f)
+        pickle.dump(target, f)
+
+
+#for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
+#    makeTransition(i)
+#    remakeTransition(i)
+#makeMNIST()
+#makeTransition()      
+#print(Y_train_one)
+
+
+#def MNIST():
+    
+
+#def main():
+#    MNIST()
     #for i in [4]:
     #    remakeCC("lost", i)
     #train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain("lost_4.mat", 0, 10)
     #print(val_dataset.labels.sum(axis=1))        
-if __name__ == "__main__":
-    main() 
+#if __name__ == "__main__":
+#    main() 
     

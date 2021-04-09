@@ -5,9 +5,9 @@ import torch.nn.functional as F
 
 import scipy.io
 from dataset import Dataset, loadTrain
-from losses import  cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function
+from losses import  cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function, svm_loss, cour_loss
 
-from networks import Prediction_Net, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net, G_Net_Tie, G_Net_Full
+from networks import Prediction_Net,LeNet5, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net, G_Net_Tie, G_Net_Full, G_Net_Hyperparameter
 import sys
 from IPython.core.debugger import Pdb
 import random
@@ -37,6 +37,9 @@ parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
 parser.add_argument('--optimizer', type=str, help="Optimizer: default Adam")
 parser.add_argument('--batch_size', type=int, help="batch_size", default = 64)
 parser.add_argument('--dataset_folder', type=str, help="dataset_folder")
+
+parser.add_argument('--val_metric',default ='acc',type=str, help="validation accuracy metric: loss or accuracy")
+
 
 parser.add_argument('--tie', default=0,type=int, help="tie embedding weights")
 argument = parser.parse_args()
@@ -213,8 +216,6 @@ def weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimi
 
 def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method, class_dim):
     p_net.train()
-    
-    #class_dim = train_loader.__getitem__(0)[1].shape[1]
     row = np.asarray(list(range(class_dim)))
     one_hot_gpu = torch.zeros((row.size, class_dim))
     one_hot_gpu = one_hot_gpu.to(device)
@@ -222,43 +223,14 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
     
     for batch_idx, (data, target) in enumerate(train_loader):
         
-        """
-        class_dim = target.shape[1]
-        batch = data.shape[0]
-        row = np.asarray(list(range(class_dim)))
-        one_hot = np.zeros((row.size, class_dim))
-        one_hot[torch.arange(row.size), row] = 1
-        #one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
-        one_hot = np.broadcast_to(one_hot, (batch, class_dim, class_dim)).reshape(batch*class_dim, class_dim)
-        
-        if(method == 'weighted_loss_xy'):
-            oh = data.numpy().repeat(class_dim, axis=0)
-            one_hot = torch.cat([torch.from_numpy(oh).float(), torch.from_numpy(one_hot).float()], dim=1).float()
-        else:
-            one_hot = torch.from_numpy(one_hot).float()
-        target_concat = torch.from_numpy(target.numpy().repeat(class_dim, axis=0)).float()
-        target_concat = target_concat.to(device)
-        data, target = data.to(device), target.to(device)
-        p_optimizer.zero_grad()
-        output = p_net(data)
-        
-        #Pdb().set_trace()
-        """
         
         data, target = data.to(device), target.to(device)
         p_optimizer.zero_grad()
         output = p_net(data)
-        
-        #Pdb().set_trace()
-        
-        #For each training example, create class_dim repeats
-        
         batch = data.shape[0]
-        
         
         one_hot = one_hot_gpu
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
-        #one_hot = one_hot.to(device)
         
         if("loss_xy" in method):
             oh = data.repeat_interleave(class_dim, dim=0)
@@ -267,15 +239,12 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         log_sigmoid = nn.LogSigmoid()
         target_concat = target.repeat_interleave(class_dim, dim=0)
-        
-        #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
         g_output = log_sigmoid(g_output) * target_concat
         g_output = g_output.sum(dim=1)
         
         split_g_output = g_output.view(batch, class_dim)
         
         if('iexplr' in method):
-            #prob = torch.softmax(output, dim=1).detach()
             log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
             prob = torch.exp(log_prob).detach()
             target_probs = (prob*target.float()).sum(dim=1)
@@ -283,16 +252,13 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
             loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
             
         else:
-        #cc_loss
             log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
             log_max_prob,max_prob_index = log_target_prob.max(dim=1)
             exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
             summ = (target*torch.exp(exp_argument)).sum(dim=1)
             log_total_prob = log_max_prob + torch.log(summ + epsilon)
             loss = (-1.0*log_total_prob).mean(dim=-1)
-        
-        
-        
+            
         loss.backward()
         
         p_optimizer.step()
@@ -304,18 +270,138 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
             100. * batch_idx / len(train_loader), loss.item()))
 
          
-def p_accuracy(test_data, p_net):
+def p_accuracy(test_data, p_net, loss_function):
     p_net.eval()
     correct = 0
+    loss = 0
+    confidence = 0
     with torch.no_grad():
         for data, target in test_data:
             data, target = data.to(device), target.to(device)
             output = p_net.forward(data)
             pred = output.data.max(1, keepdim=True)[1]
+            
+            prob = torch.softmax(output, dim=1)
+            confidence += torch.gather(prob, 1, pred).sum()
+            
+            correct += torch.gather(target, 1, pred).sum()
+            this_loss =  (loss_function(output, target))
+            loss += this_loss * len(data)
+         
+    return {'acc':(100. * float(correct.item()) / len(test_data.dataset)), 'loss':loss.item()/(len(test_data.dataset)), 'confidence': confidence.item()/len(test_data.dataset)}
+
+def p_accuracy_weighted(test_data, p_net, g_net, method, class_dim):
+    p_net.eval()
+    row = np.asarray(list(range(class_dim)))
+    one_hot_gpu = torch.zeros((row.size, class_dim))
+    one_hot_gpu = one_hot_gpu.to(device)
+    one_hot_gpu[torch.arange(row.size), row] = 1
+    
+    correct = 0
+    loss = 0
+    confidence = 0
+    with torch.no_grad():
+        for batch_idx, (data, target) in enumerate(test_data):
+            data, target = data.to(device), target.to(device)
+            output = p_net(data)
+            pred = output.data.max(1, keepdim=True)[1]
+            
+            prob = torch.softmax(output, dim=1)
+            confidence += torch.gather(prob, 1, pred).sum()
+            
             correct += torch.gather(target, 1, pred).sum()
             
-    return (100. * float(correct.item()) / len(test_data.dataset))
+            batch = data.shape[0]
+            
+            one_hot = one_hot_gpu
+            one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
+            
+            if("loss_xy" in method):
+                oh = data.repeat_interleave(class_dim, dim=0)
+                one_hot = (oh, one_hot)
+            g_output = g_net(one_hot)
+            
+            log_sigmoid = nn.LogSigmoid()
+            target_concat = target.repeat_interleave(class_dim, dim=0)
+            g_output = log_sigmoid(g_output) * target_concat
+            g_output = g_output.sum(dim=1)
+            
+            split_g_output = g_output.view(batch, class_dim)
+            
+            if('iexplr' in method):
+                log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
+                prob = torch.exp(log_prob).detach()
+                target_probs = (prob*target.float()).sum(dim=1)
+                mask = ((target == 1) & (prob > epsilon))
+                loss += ((-(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0))* batch)
+                
+            else:
+                log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
+                log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+                exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+                summ = (target*torch.exp(exp_argument)).sum(dim=1)
+                log_total_prob = log_max_prob + torch.log(summ + epsilon)
+                loss += (((-1.0*log_total_prob).mean(dim=-1)) * batch)
+    return {'acc':(100. * float(correct.item()) / len(test_data.dataset)), 'loss':loss.item()/(len(test_data.dataset)), 'confidence': confidence.item()/len(test_data.dataset)}
 
+def p_accuracy_weighted_full(test_data, p_net, g_net, method, class_dim):
+    p_net.eval()
+    
+    row = np.asarray(list(range(class_dim)))
+    y_gold = torch.arange(row.size)
+    y_dash = torch.cat(class_dim*[y_gold])
+    y_gold = y_gold.repeat_interleave(class_dim, dim=0)
+    one_hot_gpu = torch.stack([y_gold, y_dash], dim=1)
+    one_hot_gpu = one_hot_gpu.to(device)
+    
+    correct = 0
+    loss = 0
+    confidence = 0
+    for batch_idx, (data, target) in enumerate(test_data):
+        data, target = data.to(device), target.to(device)
+        
+        output = p_net(data)
+        pred = output.data.max(1, keepdim=True)[1]
+        
+        prob = torch.softmax(output, dim=1)
+        confidence += torch.gather(prob, 1, pred).sum()
+            
+        correct += torch.gather(target, 1, pred).sum()
+        batch = data.shape[0]
+        
+        one_hot = one_hot_gpu
+        one_hot = one_hot.expand(batch, class_dim*class_dim, 2).reshape(batch*class_dim*class_dim, 2)
+        
+        if("loss_xy" in method):
+            oh = data.repeat_interleave(class_dim *class_dim, dim=0)
+            one_hot = (oh, one_hot)
+        g_output = g_net(one_hot)
+        g_output = g_output.view(batch*class_dim, class_dim)
+        log_sigmoid = nn.LogSigmoid()
+        target_concat = target.repeat_interleave(class_dim, dim=0)
+        g_output = log_sigmoid(g_output) * target_concat
+        g_output = g_output.sum(dim=1)
+        
+        split_g_output = g_output.view(batch, class_dim)
+        
+        if('iexplr' in method):
+            log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
+            prob = torch.exp(log_prob).detach()
+            target_probs = (prob*target.float()).sum(dim=1)
+            mask = ((target == 1) & (prob > epsilon))
+            loss += ((-(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)) * batch)
+            
+        else:
+            log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
+            log_max_prob,max_prob_index = log_target_prob.max(dim=1)
+            exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
+            summ = (target*torch.exp(exp_argument)).sum(dim=1)
+            log_total_prob = log_max_prob + torch.log(summ + epsilon)
+            loss += ((-1.0*log_total_prob).mean(dim=-1) *  batch)
+            
+    return {'acc':(100. * float(correct.item()) / len(test_data.dataset)), 'loss':loss.item()/(len(test_data.dataset)), 'confidence': confidence.item()/len(test_data.dataset)}
+        
+  
 def q_accuracy(test_data, q_net, rl_technique):
     q_net.eval()
     correct = 0
@@ -416,6 +502,42 @@ def computeM(train_loader, output_dim, p_net):
             M[i][j] = (M[i][j]+epsilon)/(den[i]+output_dim*epsilon)
     M = torch.log(M/(1-M))
     return M
+
+def pretrainG(epochs, train_loader, output_dim, p_net, g_net, g_optimizer):
+    #M = torch.zeros((output_dim,output_dim))
+    #M = M.to(device)
+    
+    for epoch in range(1, epochs+1):
+        p_net.eval()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            
+            data, target = data.to(device), target.to(device)
+            with torch.no_grad():
+                predict = torch.softmax(p_net.forward(data), dim=1)
+                idx = torch.argmax(predict, dim=-1)
+                pred = torch.zeros( predict.shape )
+                pred[np.arange(predict.shape[0]), idx] = 1
+                
+            pred = pred.to(device) 
+            
+            g_output = g_net.forward((data, pred))
+            log_sigmoid = nn.LogSigmoid()
+            #target_concat = target.repeat_interleave(class_dim, dim=0)
+            
+            #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+            g_output = log_sigmoid(g_output)
+            
+            total_log_prob = (target*g_output).sum(dim=-1)
+            avg_log_prob = total_log_prob/target.sum(dim=-1)
+            loss =  -1*avg_log_prob.mean()
+            #g_output = g_output.sum(dim=1)
+            #Pdb().set_trace()
+            #loss = naive_loss(g_output, target)
+            loss.backward()
+            g_optimizer.step()
+            print('Pretrain {}: Loss {}'.format(epoch, loss))
+        
+    #return M
     
     
 def main():
@@ -426,7 +548,7 @@ def main():
     datasets = argument.datasets
     datasets = [str(item) for item in datasets.split(',')]
     fold_no = argument.fold_no
-    
+    val_metric = argument.val_metric
     technique = argument.technique
     
     model = argument.model
@@ -437,6 +559,7 @@ def main():
     pretrain_q = True if argument.pretrain_q == 1 else False
     pretrain_p_perc = argument.pretrain_p_perc
     
+    
     k = 10
     
     pretrain_p_epochs = 3
@@ -445,7 +568,7 @@ def main():
     shuffle_name = argument.shuffle
     
         
-    loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss']
+    loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss','cour_loss', 'svm_loss']
     
     if((argument.optimizer is None) or (argument.optimizer == "Adam")):
         optimizer = lambda x: torch.optim.Adam(x,weight_decay = 0.000001)
@@ -464,6 +587,8 @@ def main():
             n_epochs = 1500
         else:
             n_epochs = 150
+            
+        
         #n_epochs = 2
         if(shuffle_name is not None):
             filename = filename +"_"+shuffle_name
@@ -482,7 +607,7 @@ def main():
           batch_size=batch_size_test, shuffle=False)
         real_val_loader = torch.utils.data.DataLoader(real_val_dataset,
           batch_size=batch_size_test, shuffle=False)
-        
+        #Pdb().set_trace()
         logs = []
         
         if(technique in loss_techniques):
@@ -493,6 +618,10 @@ def main():
                 loss_function = min_loss
             elif(technique == "naive_loss"):
                 loss_function = naive_loss
+            elif(technique == "cour_loss"):
+                loss_function = cour_loss
+            elif(technique == "svm_loss"):
+                loss_function = svm_loss
             elif(technique == "iexplr_loss"):
                 loss_function = iexplr_loss
             elif(technique == "regularized_cc_loss"):
@@ -510,6 +639,8 @@ def main():
             set_random_seeds(1) 
             if(model == "1layer"):
                 p_net = Prediction_Net_Linear(input_dim, output_dim)
+            elif(model == "LeNet"):
+                p_net = LeNet5(input_dim, output_dim)
             else:
                 p_net = Prediction_Net(input_dim, output_dim)
                 
@@ -522,50 +653,89 @@ def main():
             result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
             train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth") 
             
-            best_val = 0
+            if(val_metric == 'loss'):
+                best_val = np.inf
+            else:
+                best_val = 0
+            
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
                 train(epoch, train_loader, loss_function, p_net, p_optimizer)
-                surrogate_train_acc = p_accuracy(train_loader, p_net)
-                real_train_acc = p_accuracy(real_train_loader, p_net)
-                surrogate_val_acc = p_accuracy(val_loader, p_net)
-                real_val_acc = p_accuracy(real_val_loader, p_net)
-                print(real_val_acc)
+                
+                surrogate_train = p_accuracy(train_loader, p_net, loss_function)
+                real_train = p_accuracy(real_train_loader, p_net, loss_function)
+                surrogate_val = p_accuracy(val_loader, p_net, loss_function)
+                real_val = p_accuracy(real_val_loader, p_net, loss_function)
+                #print(surrogate_train['confidence'])
+                #print(real_train['confidence'])
+                #print(surrogate_val['acc'])
+                #surrogate_train_acc = p_accuracy(train_loader, p_net, loss_function)['acc']
+                #real_train_acc = p_accuracy(real_train_loader, p_net, loss_function)['acc']
+                #surrogate_val_acc = p_accuracy(val_loader, p_net, loss_function)['acc']
+                #real_val_acc = p_accuracy(real_val_loader, p_net, loss_function)['acc']
+                
+                #surrogate_train_loss = p_accuracy(train_loader, p_net, loss_function)['loss']
+                #real_train_loss = p_accuracy(real_train_loader, p_net, loss_function)['loss']
+                #surrogate_val_loss = p_accuracy(val_loader, p_net, loss_function)['loss']
+                #real_val_loss = p_accuracy(real_val_loader, p_net, loss_function)['loss']
+                #print(real_val_acc)
                 
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
-                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
-                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_train_acc': surrogate_train['acc'], 'real_train_acc': real_train['acc'], 
+                           'surrogate_val_acc': surrogate_val['acc'], 'real_val_acc': real_val['acc'], 
                            'surrogate_test_acc': None, 'real_test_acc': None, 
                            'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
                            'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
                            'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
-                           'info': dataset_technique_path}
+                           'info': dataset_technique_path,
+                           'surrogate_train_loss': surrogate_train['loss'], 'real_train_loss': real_train['loss'], 
+                           'surrogate_val_loss': surrogate_val['loss'], 'real_val_loss': real_val['loss'], 
+                           'surrogate_test_loss': None, 'real_test_loss': None,
+                           'train_confidence':surrogate_train['confidence'],
+                           'val_confidence':surrogate_val['confidence'],
+                           'test_confidence':None}
                 logs.append(log)
-                if(surrogate_val_acc > best_val):
-                    best_val = surrogate_val_acc
+                
+                current_val = surrogate_val[val_metric]
+                print(current_val)
+                if(((val_metric == 'acc') and (current_val > best_val)) or ((val_metric == 'loss') and (current_val < best_val))):
+                    best_val = current_val
                     best_val_epoch = epoch
-                    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
+                    save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, train_checkpoint)
                 
             
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
-            surrogate_train_acc = p_accuracy(train_loader, p_net)
-            real_train_acc = p_accuracy(real_train_loader, p_net)
-            surrogate_val_acc = p_accuracy(val_loader, p_net)
-            real_val_acc = p_accuracy(real_val_loader, p_net)
-            surrogate_test_acc = p_accuracy(test_loader, p_net)
-            real_test_acc = p_accuracy(real_test_loader, p_net)
+            surrogate_train = p_accuracy(train_loader, p_net, loss_function)
+            real_train = p_accuracy(real_train_loader, p_net, loss_function)
+            surrogate_val = p_accuracy(val_loader, p_net, loss_function)
+            real_val = p_accuracy(real_val_loader, p_net, loss_function)
+            surrogate_test = p_accuracy(test_loader, p_net, loss_function)
+            real_test = p_accuracy(real_test_loader, p_net, loss_function)
+            
+            #surrogate_train_loss = p_accuracy(train_loader, p_net)['loss']
+            #real_train_loss = p_accuracy(real_train_loader, p_net)['loss']
+            #surrogate_val_loss = p_accuracy(val_loader, p_net)['loss']
+            #real_val_loss = p_accuracy(real_val_loader, p_net)['loss']
+            #surrogate_test_loss = p_accuracy(test_loader, p_net)['loss']
+            #real_test_loss = p_accuracy(real_test_loader, p_net)['loss']
             
             
             log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'test', 
-                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
-                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
-                           'surrogate_test_acc': surrogate_test_acc, 'real_test_acc': real_test_acc, 
+                           'surrogate_train_acc': surrogate_train['acc'], 'real_train_acc': real_train['acc'], 
+                           'surrogate_val_acc': surrogate_val['acc'], 'real_val_acc': real_val['acc'], 
+                           'surrogate_test_acc': surrogate_test['acc'], 'real_test_acc': real_test['acc'], 
                            'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
                            'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
                            'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
-                           'info': dataset_technique_path}
+                           'info': dataset_technique_path,
+                           'surrogate_train_loss': surrogate_train['loss'], 'real_train_loss': real_train['loss'], 
+                           'surrogate_val_loss': surrogate_val['loss'], 'real_val_loss': real_val['loss'], 
+                           'surrogate_test_loss': surrogate_test['loss'], 'real_test_loss': real_test['loss'],
+                           'train_confidence':surrogate_train['confidence'],
+                           'val_confidence':surrogate_val['confidence'],
+                           'test_confidence':surrogate_test['confidence']}
             logs.append(log)
             
             os.makedirs(os.path.dirname(result_log_filename_json), exist_ok=True)
@@ -589,8 +759,13 @@ def main():
             elif("tie" in technique):
                 print("Here")
                 g_net = G_Net_Tie(input_dim, output_dim, technique)
+            elif("hyperparameter" in technique):
+                g_net = G_Net_Hyperparameter(input_dim, output_dim, technique)
             else:
                 g_net = G_Net(input_dim, output_dim, technique)
+                
+            
+            
             if("loss_y"  in technique):
                 M = computeM(train_loader, output_dim, p_net) 
                 M = M.to(device)
@@ -598,59 +773,88 @@ def main():
             g_net.to(device)
             g_optimizer = optimizer(g_net.parameters())
             
+            if("pretrain" in technique):
+                pretrainG(50, train_loader, output_dim, p_net, g_net, g_optimizer)
+            
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
             result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
             train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_best.pth") 
             
-            best_val = 0
+            if(val_metric == 'loss'):
+                best_val = np.inf
+            else:
+                best_val = 0
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
                 if('full' in technique):
                     weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
+                    
+                    surrogate_train = p_accuracy_weighted_full(train_loader, p_net, g_net, technique, output_dim)
+                    real_train = p_accuracy_weighted_full(real_train_loader, p_net, g_net, technique, output_dim)
+                    surrogate_val = p_accuracy_weighted_full(val_loader, p_net, g_net, technique, output_dim)
+                    real_val = p_accuracy_weighted_full(real_val_loader, p_net, g_net, technique, output_dim)
                 else:
                     weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
+                    surrogate_train = p_accuracy_weighted(train_loader, p_net, g_net, technique, output_dim)
+                    real_train = p_accuracy_weighted(real_train_loader, p_net, g_net, technique, output_dim)
+                    surrogate_val = p_accuracy_weighted(val_loader, p_net, g_net, technique, output_dim)
+                    real_val = p_accuracy_weighted(real_val_loader, p_net, g_net, technique, output_dim)
+                #surrogate_train_acc = p_accuracy(train_loader, p_net)
+                #real_train_acc = p_accuracy(real_train_loader, p_net)
+                #surrogate_val_acc = p_accuracy(val_loader, p_net)
+                #real_val_acc = p_accuracy(real_val_loader, p_net)
                 
-                surrogate_train_acc = p_accuracy(train_loader, p_net)
-                real_train_acc = p_accuracy(real_train_loader, p_net)
-                surrogate_val_acc = p_accuracy(val_loader, p_net)
-                real_val_acc = p_accuracy(real_val_loader, p_net)
-                
-                print(surrogate_train_acc)
-                print(real_val_acc)
+             
+                #print(surrogate_train_acc)
+                #print(real_val_acc)
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
-                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
-                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
+                           'surrogate_train_acc': surrogate_train['acc'], 'real_train_acc': real_train['acc'], 
+                           'surrogate_val_acc': surrogate_val['acc'], 'real_val_acc': real_val['acc'], 
                            'surrogate_test_acc': None, 'real_test_acc': None, 
                            'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
                            'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
                            'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
-                           'info': dataset_technique_path}
+                           'info': dataset_technique_path,
+                           'surrogate_train_loss': surrogate_train['loss'], 'real_train_loss': real_train['loss'], 
+                           'surrogate_val_loss': surrogate_val['loss'], 'real_val_loss': real_val['loss'], 
+                           'surrogate_test_loss': None, 'real_test_loss': None,
+                           'train_confidence':surrogate_train['confidence'],
+                           'val_confidence':surrogate_val['confidence'],
+                           'test_confidence':None}
                 logs.append(log)
-                if(surrogate_val_acc > best_val):
-                    best_val = surrogate_val_acc
+                current_val = surrogate_val[val_metric]
+                print(current_val)
+                if(((val_metric == 'acc') and (current_val > best_val)) or ((val_metric == 'loss') and (current_val < best_val))):
+                    best_val = current_val
                     best_val_epoch = epoch
-                    save_checkpoint(epoch, surrogate_val_acc, p_net, p_optimizer, None, None, train_checkpoint)
-               
+                    save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, train_checkpoint)
             
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
-            surrogate_train_acc = p_accuracy(train_loader, p_net)
-            real_train_acc = p_accuracy(real_train_loader, p_net)
-            surrogate_val_acc = p_accuracy(val_loader, p_net)
-            real_val_acc = p_accuracy(real_val_loader, p_net)
-            surrogate_test_acc = p_accuracy(test_loader, p_net)
-            real_test_acc = p_accuracy(real_test_loader, p_net)
+            
+            surrogate_train = p_accuracy_weighted(train_loader, p_net, g_net, technique, output_dim)
+            real_train = p_accuracy_weighted(real_train_loader, p_net, g_net, technique, output_dim)
+            surrogate_val = p_accuracy_weighted(val_loader, p_net, g_net, technique, output_dim)
+            real_val = p_accuracy_weighted(real_val_loader, p_net, g_net, technique, output_dim)
+            surrogate_test = p_accuracy_weighted(test_loader, p_net, g_net, technique, output_dim)
+            real_test = p_accuracy_weighted(real_test_loader, p_net, g_net, technique, output_dim)
             
             
             log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'test', 
-                           'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
-                           'surrogate_val_acc': surrogate_val_acc, 'real_val_acc': real_val_acc, 
-                           'surrogate_test_acc': surrogate_test_acc, 'real_test_acc': real_test_acc, 
+                           'surrogate_train_acc': surrogate_train['acc'], 'real_train_acc': real_train['acc'], 
+                           'surrogate_val_acc': surrogate_val['acc'], 'real_val_acc': real_val['acc'], 
+                           'surrogate_test_acc': surrogate_test['acc'], 'real_test_acc': real_test['acc'], 
                            'q_surrogate_train_acc': None, 'q_real_train_acc': None, 
                            'q_surrogate_val_acc': None, 'q_real_val_acc': None, 
                            'q_surrogate_test_acc': None, 'q_real_test_acc': None, 
-                           'info': dataset_technique_path}
+                           'info': dataset_technique_path,
+                           'surrogate_train_loss': surrogate_train['loss'], 'real_train_loss': real_train['loss'], 
+                           'surrogate_val_loss': surrogate_val['loss'], 'real_val_loss': real_val['loss'], 
+                           'surrogate_test_loss': surrogate_test['loss'], 'real_test_loss': real_test['loss'],
+                           'train_confidence':surrogate_train['confidence'],
+                           'val_confidence':surrogate_val['confidence'],
+                           'test_confidence':surrogate_test['confidence']}
             logs.append(log)
             
             os.makedirs(os.path.dirname(result_log_filename_json), exist_ok=True)
@@ -707,6 +911,7 @@ def main():
                         real_train_acc = p_accuracy(real_train_loader, p_net)
                         surrogate_val_acc = p_accuracy(val_loader, p_net)
                         real_val_acc = p_accuracy(real_val_loader, p_net)
+                        
                         
                         log = {'epoch':epoch, 'best_epoch': None,'phase': 'pretrain_p', 
                                    'surrogate_train_acc': surrogate_train_acc, 'real_train_acc': real_train_acc, 
