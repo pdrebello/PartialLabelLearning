@@ -7,7 +7,7 @@ import scipy.io
 from dataset import Dataset, loadTrain
 from losses import  cc_loss, weighted_cc_loss, min_loss, naive_loss, iexplr_loss, regularized_cc_loss, sample_loss_function, sample_reward_function, select_loss_function, select_reward_function, svm_loss, cour_loss
 
-from networks import Prediction_Net,LeNet5, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net, G_Net_Tie, G_Net_Full, G_Net_Hyperparameter
+from networks import Prediction_Net,LeNet5, Prediction_Net_Linear, Selection_Net, Phi_Net, G_Net_Tie, G_Net_Full, G_Net_Hyperparameter, G_Net_Y, G_Net_XY
 import sys
 from IPython.core.debugger import Pdb
 import random
@@ -31,6 +31,9 @@ parser.add_argument('--lambd', type=float, help="regularization cc_loss hyperpar
 
 parser.add_argument('--pretrain_p', type=int, help="Pretrain P network")
 parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
+
+parser.add_argument('--pretrain', type=int, default = 0, help="Pretrain Weighted network")
+
 
 parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network percentage")
 parser.add_argument('--shuffle', type=str, help="Experiment with datasets")
@@ -240,6 +243,8 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         log_sigmoid = nn.LogSigmoid()
         target_concat = target.repeat_interleave(class_dim, dim=0)
         g_output = log_sigmoid(g_output) * target_concat
+        #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+        
         g_output = g_output.sum(dim=1)
         
         split_g_output = g_output.view(batch, class_dim)
@@ -581,12 +586,12 @@ def main():
         
     
     for filename in datasets:
-        if(filename in ['lost', 'MSRCv2']):
+        if(filename in ['MSRCv2']):
             n_epochs = 1000
-        elif(filename in ['BirdSong']):
+        elif(filename in ['lost','BirdSong']):
             n_epochs = 1500
         else:
-            n_epochs = 150
+            n_epochs = 200
             
         
         #n_epochs = 2
@@ -699,6 +704,7 @@ def main():
                 
                 current_val = surrogate_val[val_metric]
                 print(current_val)
+                #print(real_test['acc'])
                 if(((val_metric == 'acc') and (current_val > best_val)) or ((val_metric == 'loss') and (current_val < best_val))):
                     best_val = current_val
                     best_val_epoch = epoch
@@ -744,26 +750,41 @@ def main():
                     json.dump(log, file)
                     file.write("\n")
         elif("weighted" in technique ):
+            if("fully_supervised" in technique):
+                train_loader = real_train_loader
+                test_loader = real_test_loader
+                val_loader = real_val_loader
+                
             dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
             
             p_net = Prediction_Net(input_dim, output_dim)
             p_net.to(device)
             p_optimizer = optimizer(p_net.parameters())
-            dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
-            train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
-            checkpoint = torch.load(train_checkpoint)
-            p_net.load_state_dict(checkpoint['p_net_state_dict'])
             
-            if("full" in technique):
+            if(argument.pretrain == 1):
+                if('iexplr' in technique):
+                    dataset_pretrain_technique_path = os.path.join(filename, model, "iexplr_loss", str(fold_no))
+                elif('fully_supervised' in technique):
+                    dataset_pretrain_technique_path = os.path.join(filename, model, "fully_supervised", str(fold_no))
+                else:
+                    dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
+                
+                train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
+                checkpoint = torch.load(train_checkpoint)
+                p_net.load_state_dict(checkpoint['p_net_state_dict'])
+            
+            
+            
+            if(("full" in technique) and not ("fully" in technique)):
                 g_net = G_Net_Full(input_dim, output_dim, technique)
             elif("tie" in technique):
-                print("Here")
                 g_net = G_Net_Tie(input_dim, output_dim, technique)
             elif("hyperparameter" in technique):
                 g_net = G_Net_Hyperparameter(input_dim, output_dim, technique)
+            elif("_xy" in technique):
+                g_net = G_Net_XY(input_dim, output_dim, technique)
             else:
-                g_net = G_Net(input_dim, output_dim, technique)
-                
+                g_net = G_Net_Y(input_dim, output_dim, technique)
             
             
             if("loss_y"  in technique):
@@ -771,6 +792,7 @@ def main():
                 M = M.to(device)
                 g_net.setWeights(M)
             g_net.to(device)
+            #Pdb().set_trace()
             g_optimizer = optimizer(g_net.parameters())
             
             if("pretrain" in technique):
@@ -786,7 +808,7 @@ def main():
                 best_val = 0
             best_val_epoch = -1
             for epoch in range(1,n_epochs+1):
-                if('full' in technique):
+                if(("full" in technique) and not ("fully" in technique)):
                     weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
                     
                     surrogate_train = p_accuracy_weighted_full(train_loader, p_net, g_net, technique, output_dim)
@@ -799,6 +821,8 @@ def main():
                     real_train = p_accuracy_weighted(real_train_loader, p_net, g_net, technique, output_dim)
                     surrogate_val = p_accuracy_weighted(val_loader, p_net, g_net, technique, output_dim)
                     real_val = p_accuracy_weighted(real_val_loader, p_net, g_net, technique, output_dim)
+                    #real_test = p_accuracy_weighted(real_test_loader, p_net, g_net, technique, output_dim)
+            
                 #surrogate_train_acc = p_accuracy(train_loader, p_net)
                 #real_train_acc = p_accuracy(real_train_loader, p_net)
                 #surrogate_val_acc = p_accuracy(val_loader, p_net)
@@ -825,6 +849,7 @@ def main():
                 logs.append(log)
                 current_val = surrogate_val[val_metric]
                 print(current_val)
+                #print(real_test['acc'])
                 if(((val_metric == 'acc') and (current_val > best_val)) or ((val_metric == 'loss') and (current_val < best_val))):
                     best_val = current_val
                     best_val_epoch = epoch

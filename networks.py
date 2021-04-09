@@ -131,51 +131,56 @@ class Selection_Net(nn.Module):
         x = self.phi_net(x, p, targetSet, rl_technique)
         return x
     
-class G_Net(nn.Module):
+class G_Net_Y(nn.Module):
     def __init__(self, x_dim, class_dim, method):
-        super(G_Net, self).__init__()
+        super(G_Net_Y, self).__init__()
         self.x_dim = x_dim
         self.class_dim = class_dim
         self.method = method
-        if("loss_y" in self.method):
-            self.fc1 = nn.Linear(class_dim, class_dim)
-            for i in range(self.class_dim):
-                self.fc1.weight[i][i].trainable = False
-        elif('loss_xy' in self.method):
-            self.fc1 = nn.Linear(self.x_dim + 20, 512)
-            self.fc2 = nn.Linear(512, 256)
-            self.fc3 = nn.Linear(256, 20)
-            self.fc4 = nn.Linear(20, self.class_dim)
-            self.bn1 = nn.BatchNorm1d(512)
-            self.bn2 = nn.BatchNorm1d(256)
-            self.bn3 = nn.BatchNorm1d(20)
-            self.embedding = torch.nn.Embedding(self.class_dim, 20)
-            torch.nn.init.xavier_uniform(self.fc1.weight)
-            torch.nn.init.xavier_uniform(self.fc2.weight)
-            torch.nn.init.xavier_uniform(self.fc3.weight)
-            torch.nn.init.xavier_uniform(self.fc4.weight)
-            
+        self.fc1 = nn.Linear(class_dim, class_dim)
+        
     
     def forward(self, inp):
         #inp is a (batchsize x class_dim) x class_dim Vector
-        if("loss_y" in self.method):
-            x = self.fc1(inp)
-            return x
-        elif('loss_xy' in self.method):
-            #Pdb().set_trace()
-            x = inp[0]
-            y = inp[1].argmax(dim=1).long()
-            y = self.embedding(y)
-            x = torch.cat([x, y], dim=1)
-            x = F.elu(self.bn1(self.fc1(x)))
-            x = F.elu(self.bn2(self.fc2(x)))
-            x = F.elu(self.bn3(self.fc3(x)))
-            x = self.fc4(x)
-            return x
-            
+        x = self.fc1(inp)
+        return x
+    
     def setWeights(self, M):
         self.fc1.weight.data = M
+
+class G_Net_XY(nn.Module):
+    def __init__(self, x_dim, class_dim, method):
+        super(G_Net_XY, self).__init__()
+        self.x_dim = x_dim
+        self.class_dim = class_dim
+        self.method = method
+        
+        self.fc1 = nn.Linear(self.x_dim + 20, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 20)
+        self.fc4 = nn.Linear(20, self.class_dim)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.bn2 = nn.BatchNorm1d(256)
+        self.bn3 = nn.BatchNorm1d(20)
+        self.embedding = torch.nn.Embedding(self.class_dim, 20)
+        torch.nn.init.xavier_uniform(self.fc1.weight)
+        torch.nn.init.xavier_uniform(self.fc2.weight)
+        torch.nn.init.xavier_uniform(self.fc3.weight)
+        torch.nn.init.xavier_uniform(self.fc4.weight)
+        
     
+    def forward(self, inp):
+        #inp is a (batchsize x class_dim) x class_dim Vector
+        x = inp[0]
+        y = inp[1].argmax(dim=1).long()
+        y = self.embedding(y)
+        x = torch.cat([x, y], dim=1)
+        x = F.elu(self.bn1(self.fc1(x)))
+        x = F.elu(self.bn2(self.fc2(x)))
+        x = F.elu(self.bn3(self.fc3(x)))
+        x = self.fc4(x)
+        return x
+              
     
 class G_Net_Tie(nn.Module):
     def __init__(self, x_dim, class_dim, method):
