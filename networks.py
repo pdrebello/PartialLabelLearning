@@ -138,15 +138,21 @@ class G_Net_Y(nn.Module):
         self.class_dim = class_dim
         self.method = method
         self.fc1 = nn.Linear(class_dim, class_dim)
+        torch.nn.init.xavier_uniform(self.fc1.weight)
+        print(torch.mean(self.fc1.weight[0][0]))
         
-    
     def forward(self, inp):
+        
+        #Pdb().set_trace()
+        #print(self.fc1.weight[0][0])
         #inp is a (batchsize x class_dim) x class_dim Vector
         x = self.fc1(inp)
         return x
     
     def setWeights(self, M):
         self.fc1.weight.data = M
+
+#g_net = G_Net_Y()
 
 class G_Net_XY(nn.Module):
     def __init__(self, x_dim, class_dim, method):
