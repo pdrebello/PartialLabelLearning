@@ -151,6 +151,7 @@ class G_Net_Y(nn.Module):
     
     def setWeights(self, M):
         self.fc1.weight.data = M
+        self.fc1.bias.data = torch.zeros_like(self.fc1.bias.data)
 
 #g_net = G_Net_Y()
 

@@ -241,17 +241,21 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         if("loss_xy" in method):
             oh = data.repeat_interleave(class_dim, dim=0)
             one_hot = (oh, one_hot)
+            
         with torch.no_grad():
             g_output = g_net(one_hot)
+        
+            
         #print(g_net.fc1.weight[0][0])
         
-        log_sigmoid = nn.LogSigmoid()
+        #log_sigmoid = nn.LogSigmoid()
         target_concat = target.repeat_interleave(class_dim, dim=0)
-        g_output = log_sigmoid(g_output) * target_concat
-        #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+        #g_output = log_sigmoid(g_output) * target_concat
+        g_output = g_output * target_concat
+        #g_output = g_output * target_concat + (1-g_output)*(1-target_concat)
         
         g_output = g_output.sum(dim=1)
-        
+        #print(g_output)
         split_g_output = g_output.view(batch, class_dim)
         
         if('iexplr' in method):
@@ -496,14 +500,20 @@ def computeM(train_loader, output_dim, p_net):
     den = torch.zeros(output_dim)
     den = den.to(device)
     p_net.eval()
+    #test_sum = torch.zeros(1)
+    #test_sum = test_sum.to(device)
     for batch_idx, (data, target) in enumerate(train_loader):
         
         data, target = data.to(device), target.to(device)
         with torch.no_grad():
+            
             predict = torch.softmax(p_net.forward(data), dim=1)
             idx = torch.argmax(predict, dim=-1)
+            
             pred = torch.zeros( predict.shape )
             pred[np.arange(predict.shape[0]), idx] = 1
+            #test_sum += (target*pred).sum()
+            
             
         pred = pred.to(device) 
         for i in range(output_dim):
@@ -514,7 +524,9 @@ def computeM(train_loader, output_dim, p_net):
     for i in range(output_dim):
         for j in range(output_dim):
             M[i][j] = (M[i][j]+epsilon)/(den[i]+output_dim*epsilon)
-    M = torch.log(M/(1-M))
+    #print(test_sum/len(train_loader.dataset))
+    #M = torch.log(M/(1-M))
+    #Pdb().set_trace()
     return M
 
 def pretrainG(epochs, train_loader, output_dim, p_net, g_net, g_optimizer):
@@ -814,17 +826,23 @@ def main():
             
             
             if("loss_y"  in technique):
-                initialiseG_Net_Y(g_net, filename, dataset_folder)
+                #initialiseG_Net_Y(g_net, filename, dataset_folder)
                 
-            #    M = computeM(train_loader, output_dim, p_net) 
-            #    M = M.to(device)
-            #    g_net.setWeights(M)
+                M = computeM(train_loader, output_dim, p_net) 
+                M = M.to(device)
+                g_net.setWeights(torch.transpose(M,0,1))
+                
             g_net.to(device)
+            #for i in range(16):
+            #    inp = torch.zeros((1,16))
+            #    inp[0,i] = 1
+            #    inp = inp.to(device)
+            #    print(g_net(inp).sum())
             #Pdb().set_trace()
             g_optimizer = optimizer(g_net.parameters())
             
-            if("pretrain" in technique):
-                pretrainG(50, train_loader, output_dim, p_net, g_net, g_optimizer)
+            #if("pretrain" in technique):
+            #    pretrainG(50, train_loader, output_dim, p_net, g_net, g_optimizer)
             
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
             result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")

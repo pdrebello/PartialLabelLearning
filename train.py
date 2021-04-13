@@ -82,7 +82,7 @@ def train(epoch, train_loader, loss_function, p_net, p_optimizer, M = None):
             loss = loss_function(output, target, M)
         else:
             loss = loss_function(output, target)
-
+        #Pdb().set_trace()
         loss.backward()
         
         p_optimizer.step()
@@ -791,10 +791,10 @@ def main():
                 g_net = G_Net_Y(input_dim, output_dim, technique)
             
             
-            if("loss_y"  in technique):
-                M = computeM(train_loader, output_dim, p_net) 
-                M = M.to(device)
-                g_net.setWeights(M)
+            #if("loss_y"  in technique):
+            #    M = computeM(train_loader, output_dim, p_net) 
+            #    M = M.to(device)
+            #    g_net.setWeights(M)
             g_net.to(device)
             #Pdb().set_trace()
             g_optimizer = optimizer(g_net.parameters())
