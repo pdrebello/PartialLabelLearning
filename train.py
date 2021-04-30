@@ -17,6 +17,7 @@ import json
 import argparse
 import numpy as np
 import pandas as pd
+from torch.optim.lr_scheduler import LambdaLR
 
 parser = argparse.ArgumentParser(description = "Description for my parser")
 
@@ -33,6 +34,9 @@ parser.add_argument('--pretrain_p', type=int, help="Pretrain P network")
 parser.add_argument('--pretrain_q', type=int, help="Pretrain Q network")
 
 parser.add_argument('--pretrain', type=int, default = 0, help="Pretrain Weighted network")
+
+parser.add_argument('--lr', type=float, help="learning rate", default = 0.001)
+parser.add_argument('--weight_decay', type=float, help="weight decay", default = 0.000001)
 
 
 parser.add_argument('--pretrain_p_perc', type=str, help="Pretrain P network percentage")
@@ -54,7 +58,7 @@ learning_rate = 0.001
 momentum = 0.5
 log_interval = 10
 
-epsilon = 1e-6
+epsilon = 10e-12
 
 #Reproducibility
 def set_random_seeds(random_seed):
@@ -219,6 +223,7 @@ def weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimi
 
 def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, method, class_dim):
     p_net.train()
+    
     row = np.asarray(list(range(class_dim)))
     one_hot_gpu = torch.zeros((row.size, class_dim))
     one_hot_gpu = one_hot_gpu.to(device)
@@ -234,40 +239,68 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
         
         one_hot = one_hot_gpu
         one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
-        
+        #Pdb().set_trace()
         if("loss_xy" in method):
-            oh = data.repeat_interleave(class_dim, dim=0)
-            one_hot = (oh, one_hot)
-        g_output = g_net(one_hot)
-        
-        log_sigmoid = nn.LogSigmoid()
-        target_concat = target.repeat_interleave(class_dim, dim=0)
-        g_output = log_sigmoid(g_output) * target_concat
-        #g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
-        
-        g_output = g_output.sum(dim=1)
-        
+            
+            relevant_indices = target.nonzero()
+            input_x = data[relevant_indices[:,0]]
+            input_y = relevant_indices[:,1]
+            
+            g_output = g_net((input_x,input_y),device)
+            log_sigmoid = nn.LogSigmoid()
+            
+            target_concat = target[relevant_indices[:,0]]
+            #if(epoch == 20):
+            #    Pdb().set_trace()
+            g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+            g_output = g_output.sum(dim=1)
+            
+            temp = torch.zeros((batch*class_dim))
+            temp = temp.to(device)
+            project_index = relevant_indices[:,0] * class_dim + relevant_indices[:,1]
+            temp[project_index] = g_output
+            g_output = temp
+            #Pdb().set_trace()
+            
+            
+            
+            
+        else:    
+            g_output = g_net(one_hot)
+            
+            log_sigmoid = nn.LogSigmoid()
+            target_concat = target.repeat_interleave(class_dim, dim=0)
+            #g_output = log_sigmoid(g_output) * target_concat
+            #g_output = torch.log_softmax(g_output, dim=1) * target_concat
+            g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+            
+            g_output = g_output.sum(dim=1)
+        #Pdb().set_trace()
         split_g_output = g_output.view(batch, class_dim)
         
         if('iexplr' in method):
-            log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
+            log_prob =  split_g_output + torch.log_softmax(output, dim=1)
             prob = torch.exp(log_prob).detach()
+            #prob = log_prob.detach()
             target_probs = (prob*target.float()).sum(dim=1)
-            mask = ((target == 1) & (prob > epsilon))
+            mask = ((target == 1) & (abs(prob) > epsilon))
+            #Pdb().set_trace()
             loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
             
         else:
+            if(epoch == 10):
+                Pdb().set_trace()
             log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
             log_max_prob,max_prob_index = log_target_prob.max(dim=1)
             exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
             summ = (target*torch.exp(exp_argument)).sum(dim=1)
             log_total_prob = log_max_prob + torch.log(summ + epsilon)
             loss = (-1.0*log_total_prob).mean(dim=-1)
-            
+         
         loss.backward()
         
         p_optimizer.step()
-        g_optimizer.step()
+        #g_optimizer.step()
         
         if batch_idx % log_interval == 0:
           print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
@@ -322,16 +355,46 @@ def p_accuracy_weighted(test_data, p_net, g_net, method, class_dim):
             one_hot = one_hot.expand(batch, class_dim, class_dim).reshape(batch*class_dim, class_dim)
             
             if("loss_xy" in method):
-                oh = data.repeat_interleave(class_dim, dim=0)
-                one_hot = (oh, one_hot)
-            g_output = g_net(one_hot)
-            
-            log_sigmoid = nn.LogSigmoid()
-            target_concat = target.repeat_interleave(class_dim, dim=0)
-            g_output = log_sigmoid(g_output) * target_concat
-            g_output = g_output.sum(dim=1)
+                relevant_indices = target.nonzero()
+                input_x = data[relevant_indices[:,0]]
+                input_y = relevant_indices[:,1]
+                
+                g_output = g_net((input_x,input_y), device)
+                log_sigmoid = nn.LogSigmoid()
+                
+                target_concat = target[relevant_indices[:,0]]
+                
+                
+                g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+                g_output = g_output.sum(dim=1)
+                
+                temp = torch.zeros((batch*class_dim))
+                temp = temp.to(device)
+                project_index = relevant_indices[:,0] * class_dim + relevant_indices[:,1]
+                temp[project_index] = g_output
+                g_output = temp
+                
+                #zer = torch.zeros_like(batch, g_output.shape[1])
+                #zer.index_add_(0, relevant_indices[:,0], g_output)
+                #oh = data.repeat_interleave(class_dim, dim=0)
+                #one_hot = (oh, one_hot)
+                
+                
+                
+                
+            else:    
+                g_output = g_net(one_hot)
+                
+                log_sigmoid = nn.LogSigmoid()
+                target_concat = target.repeat_interleave(class_dim, dim=0)
+                #g_output = log_sigmoid(g_output) * target_concat
+                #g_output = torch.log_softmax(g_output, dim=1) * target_concat
+                g_output = log_sigmoid(g_output) * target_concat + (log_sigmoid(-g_output))*(1-target_concat)
+                
+                g_output = g_output.sum(dim=1)
             
             split_g_output = g_output.view(batch, class_dim)
+            
             
             if('iexplr' in method):
                 log_prob =  split_g_output+ torch.log_softmax(output, dim=1)
@@ -547,7 +610,15 @@ def pretrainG(epochs, train_loader, output_dim, p_net, g_net, g_optimizer):
             print('Pretrain {}: Loss {}'.format(epoch, loss))
         
     #return M
-    
+def lr_lambda(epoch: int):
+    #if(100 < epoch < 1000):
+    #    return 0.1
+    if(200 > epoch):
+        return pow(0.98, epoch-1)
+    else:
+        return (0.01)
+
+# Optimizer has lr set to 0.01
     
 def main():
     
@@ -580,25 +651,28 @@ def main():
     loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss','cour_loss', 'svm_loss']
     
     if((argument.optimizer is None) or (argument.optimizer == "Adam")):
-        optimizer = lambda x: torch.optim.Adam(x,weight_decay = 0.000001)
+        wd = argument.weight_decay
+        lr = argument.lr
+        optimizer = lambda x: torch.optim.Adam(x,weight_decay = wd, lr = lr)
         #optimizer = torch.optim.Adam
     elif(argument.optimizer == 'SGD'):
-        optimizer = lambda x: torch.optim.SGD(x, lr=0.1, momentum=0.9)
-        #optimizer = torch.optim.SGD
+        lr = argument.lr
+        wd = argument.weight_decay
+        optimizer = lambda x: torch.optim.SGD(x, lr=lr, momentum=0.9, weight_decay = wd)
     else:
         optimizer = torch.optim.Adam
         
     
+  
+    
     for filename in datasets:
-        if(filename in ['MSRCv2']):
+        if('MSRCv2' in filename):
             n_epochs = 1000
-        elif(filename in ['lost','BirdSong']):
+        elif(('lost' in filename) or ('BirdSong' in filename)):
             n_epochs = 1500
         else:
             n_epochs = 200
-            
         
-        #n_epochs = 2
         if(shuffle_name is not None):
             filename = filename +"_"+shuffle_name
         train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, input_dim, output_dim = loadTrain(os.path.join(dataset_folder,filename+".mat"), fold_no, k)
@@ -618,26 +692,29 @@ def main():
           batch_size=batch_size_test, shuffle=False)
         #Pdb().set_trace()
         logs = []
-        
-        if(technique in loss_techniques):
+        flag = False
+        for i in loss_techniques:
+            if((i in technique) and (not("weighted" in technique))):
+                flag = True
+        if(flag):
             dataset_technique_path = os.path.join(filename, model, technique, str(fold_no))
-            if(technique == "cc_loss"):
+            if("cc_loss" in technique):
                 loss_function = cc_loss
-            elif(technique == "min_loss"):
+            elif("min_loss" in technique):
                 loss_function = min_loss
-            elif(technique == "naive_loss"):
+            elif("naive_loss" in technique):
                 loss_function = naive_loss
-            elif(technique == "cour_loss"):
+            elif("cour_loss" in technique):
                 loss_function = cour_loss
-            elif(technique == "svm_loss"):
+            elif("svm_loss" in technique):
                 loss_function = svm_loss
-            elif(technique == "iexplr_loss"):
+            elif("iexplr_loss" in technique):
                 loss_function = iexplr_loss
-            elif(technique == "regularized_cc_loss"):
+            elif("regularized_cc_loss" in technique):
                 lambd = argument.lambd
                 loss_function = lambda x, y : regularized_cc_loss(lambd, x, y)
                 dataset_technique_path = os.path.join(filename, model, technique+"_"+str(lambd), str(fold_no))
-            elif(technique == "fully_supervised"):
+            elif("fully_supervised" in technique):
                 #loss_function = ce_loss
                 loss_function = naive_loss
                 #loss_function = min_loss
@@ -655,7 +732,7 @@ def main():
                 
             p_net.to(device)
             p_optimizer = optimizer(p_net.parameters())
-            
+            p_scheduler = LambdaLR(p_optimizer, lr_lambda=lr_lambda)   
             
             
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
@@ -675,19 +752,9 @@ def main():
                 real_train = p_accuracy(real_train_loader, p_net, loss_function)
                 surrogate_val = p_accuracy(val_loader, p_net, loss_function)
                 real_val = p_accuracy(real_val_loader, p_net, loss_function)
-                #print(surrogate_train['confidence'])
-                #print(real_train['confidence'])
-                #print(surrogate_val['acc'])
-                #surrogate_train_acc = p_accuracy(train_loader, p_net, loss_function)['acc']
-                #real_train_acc = p_accuracy(real_train_loader, p_net, loss_function)['acc']
-                #surrogate_val_acc = p_accuracy(val_loader, p_net, loss_function)['acc']
-                #real_val_acc = p_accuracy(real_val_loader, p_net, loss_function)['acc']
-                
-                #surrogate_train_loss = p_accuracy(train_loader, p_net, loss_function)['loss']
-                #real_train_loss = p_accuracy(real_train_loader, p_net, loss_function)['loss']
-                #surrogate_val_loss = p_accuracy(val_loader, p_net, loss_function)['loss']
-                #real_val_loss = p_accuracy(real_val_loader, p_net, loss_function)['loss']
-                #print(real_val_acc)
+                p_scheduler.step()
+                for param_group in p_optimizer.param_groups:
+                    print(param_group['lr'])
                 
                 
                 log = {'epoch':epoch, 'best_epoch': best_val_epoch,'phase': 'train', 
@@ -724,12 +791,7 @@ def main():
             surrogate_test = p_accuracy(test_loader, p_net, loss_function)
             real_test = p_accuracy(real_test_loader, p_net, loss_function)
             
-            #surrogate_train_loss = p_accuracy(train_loader, p_net)['loss']
-            #real_train_loss = p_accuracy(real_train_loader, p_net)['loss']
-            #surrogate_val_loss = p_accuracy(val_loader, p_net)['loss']
-            #real_val_loss = p_accuracy(real_val_loader, p_net)['loss']
-            #surrogate_test_loss = p_accuracy(test_loader, p_net)['loss']
-            #real_test_loss = p_accuracy(real_test_loader, p_net)['loss']
+            
             
             
             log = {'epoch':-1, 'best_epoch': best_val_epoch, 'phase': 'test', 
@@ -764,18 +826,20 @@ def main():
             p_net = Prediction_Net(input_dim, output_dim)
             p_net.to(device)
             p_optimizer = optimizer(p_net.parameters())
+            p_scheduler = LambdaLR(p_optimizer, lr_lambda=lr_lambda)   
             
             if(argument.pretrain == 1):
                 if('iexplr' in technique):
-                    dataset_pretrain_technique_path = os.path.join(filename, model, "iexplr_loss", str(fold_no))
+                    dataset_pretrain_technique_path = os.path.join(filename, model, "iexplr_loss_{}_{}_{}".format(argument.optimizer,argument.lr,argument.weight_decay), str(fold_no))
                 elif('fully_supervised' in technique):
-                    dataset_pretrain_technique_path = os.path.join(filename, model, "fully_supervised", str(fold_no))
+                    dataset_pretrain_technique_path = os.path.join(filename, model, "fully_supervised_{}_{}_{}".format(argument.optimizer,argument.lr,argument.weight_decay), str(fold_no))
                 else:
-                    dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss", str(fold_no))
+                    dataset_pretrain_technique_path = os.path.join(filename, model, "cc_loss_{}_{}_{}".format(argument.optimizer,argument.lr,argument.weight_decay), str(fold_no))
                 
                 train_checkpoint = os.path.join(dump_dir, dataset_pretrain_technique_path, "models", "train_best.pth") 
                 checkpoint = torch.load(train_checkpoint)
                 p_net.load_state_dict(checkpoint['p_net_state_dict'])
+                
             
             
             
@@ -799,8 +863,13 @@ def main():
             #Pdb().set_trace()
             g_optimizer = optimizer(g_net.parameters())
             
+            
+            g_scheduler = LambdaLR(g_optimizer, lr_lambda=lr_lambda) 
+            
+            
             if("pretrain" in technique):
                 pretrainG(50, train_loader, output_dim, p_net, g_net, g_optimizer)
+            
             
             result_filename = os.path.join(dump_dir, dataset_technique_path, "results", "out.txt")
             result_log_filename_json = os.path.join(dump_dir, dataset_technique_path, "logs", "log.json")
@@ -810,7 +879,10 @@ def main():
                 best_val = np.inf
             else:
                 best_val = 0
+            
             best_val_epoch = -1
+            
+            
             for epoch in range(1,n_epochs+1):
                 if(("full" in technique) and not ("fully" in technique)):
                     weighted_train_full(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, technique, output_dim)
@@ -825,8 +897,12 @@ def main():
                     real_train = p_accuracy_weighted(real_train_loader, p_net, g_net, technique, output_dim)
                     surrogate_val = p_accuracy_weighted(val_loader, p_net, g_net, technique, output_dim)
                     real_val = p_accuracy_weighted(real_val_loader, p_net, g_net, technique, output_dim)
-                    #real_test = p_accuracy_weighted(real_test_loader, p_net, g_net, technique, output_dim)
-            
+                
+                g_scheduler.step()
+                p_scheduler.step()
+                
+                #real_test = p_accuracy_weighted(real_test_loader, p_net, g_net, technique, output_dim)
+                #print(g_net.fc1.bias)
                 #surrogate_train_acc = p_accuracy(train_loader, p_net)
                 #real_train_acc = p_accuracy(real_train_loader, p_net)
                 #surrogate_val_acc = p_accuracy(val_loader, p_net)
@@ -858,6 +934,15 @@ def main():
                     best_val = current_val
                     best_val_epoch = epoch
                     save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, train_checkpoint, g_net = g_net, g_optimizer = g_optimizer)
+                
+                epoch_train_checkpoint = os.path.join(dump_dir, dataset_technique_path, "models", "train_{}.pth".format(epoch)) 
+                if('Soccer' in filename):
+                    if((epoch <= 20) or (epoch%20 == 0)):
+                        save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, epoch_train_checkpoint, g_net = g_net, g_optimizer = g_optimizer)
+            
+                else:
+                    if((epoch <= 20) or (epoch%50 == 0)):
+                        save_checkpoint(epoch, current_val, p_net, p_optimizer, None, None, epoch_train_checkpoint, g_net = g_net, g_optimizer = g_optimizer)
             
             checkpoint = torch.load(train_checkpoint)
             p_net.load_state_dict(checkpoint['p_net_state_dict'])
