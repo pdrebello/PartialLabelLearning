@@ -288,14 +288,14 @@ def weighted_train(epoch, train_loader, p_net, p_optimizer, g_net, g_optimizer, 
             loss = -(prob[mask]*log_prob[mask]/ target_probs.unsqueeze(1).expand_as(mask)[mask]).sum() / mask.size(0)
             
         else:
-            if(epoch == 10):
-                Pdb().set_trace()
+            #if(epoch == 10):
+            #    Pdb().set_trace()
             log_target_prob = split_g_output +  F.log_softmax(output, dim = 1)
             log_max_prob,max_prob_index = log_target_prob.max(dim=1)
             exp_argument = log_target_prob - log_max_prob.unsqueeze(dim=1)
             summ = (target*torch.exp(exp_argument)).sum(dim=1)
             log_total_prob = log_max_prob + torch.log(summ + epsilon)
-            loss = (-1.0*log_total_prob).mean(dim=-1)
+            loss = (-1.0*log_total_prob).mean(dim=-1)/100
          
         loss.backward()
         
