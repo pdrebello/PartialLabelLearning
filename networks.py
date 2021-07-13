@@ -139,49 +139,172 @@ class G_Net_Y(nn.Module):
         self.method = method
         self.fc1 = nn.Linear(class_dim, class_dim)
         
-    
+        
+        torch.nn.init.xavier_uniform(self.fc1.weight)
+        #self.fc1.bias.data = torch.zeros_like(self.fc1.bias.data)
+        #self.fc1.bias.requires_grad = False
+        #print(torch.mean(self.fc1.weight[0][0]))
+        
     def forward(self, inp):
+        
+        #
+        #print(self.fc1.weight[0][0])
         #inp is a (batchsize x class_dim) x class_dim Vector
+       
         x = self.fc1(inp)
+        x = x - x*inp + 15*inp
+        #print(x)
+        #Pdb().set_trace()
         return x
     
     def setWeights(self, M):
         self.fc1.weight.data = M
+        self.fc1.bias.data = torch.zeros_like(self.fc1.bias.data)
 
+#g_net = G_Net_Y()
 class G_Net_XY(nn.Module):
     def __init__(self, x_dim, class_dim, method):
         super(G_Net_XY, self).__init__()
         self.x_dim = x_dim
         self.class_dim = class_dim
-        self.method = method
+        #self.method = method
         
-        self.fc1 = nn.Linear(self.x_dim + 20, 512)
+        self.fc1 = nn.Linear(self.x_dim + 96, 512)
         self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 20)
-        self.fc4 = nn.Linear(20, self.class_dim)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, self.class_dim)
         self.bn1 = nn.BatchNorm1d(512)
         self.bn2 = nn.BatchNorm1d(256)
-        self.bn3 = nn.BatchNorm1d(20)
-        self.embedding = torch.nn.Embedding(self.class_dim, 20)
+        self.bn3 = nn.BatchNorm1d(128)
+        self.embedding = torch.nn.Embedding(self.class_dim, 96)
+        #torch.nn.init.xavier_uniform(self.embedding.weight)
         torch.nn.init.xavier_uniform(self.fc1.weight)
         torch.nn.init.xavier_uniform(self.fc2.weight)
         torch.nn.init.xavier_uniform(self.fc3.weight)
         torch.nn.init.xavier_uniform(self.fc4.weight)
         
     
-    def forward(self, inp):
+    def forward(self, inp, device):
         #inp is a (batchsize x class_dim) x class_dim Vector
+        #Pdb().set_trace()
+        one_hot_gpu = torch.zeros((inp[0].shape[0], self.class_dim))
+        one_hot_gpu = one_hot_gpu.to(device)
+        one_hot_gpu[torch.arange(inp[0].shape[0]), inp[1]] = 1
+        
         x = inp[0]
-        y = inp[1].argmax(dim=1).long()
+        #y = inp[1].argmax(dim=1).long()
+        y = inp[1].long()
+        #y = one_hot_gpu
         y = self.embedding(y)
         x = torch.cat([x, y], dim=1)
         x = F.elu(self.bn1(self.fc1(x)))
         x = F.elu(self.bn2(self.fc2(x)))
         x = F.elu(self.bn3(self.fc3(x)))
+        #x = F.elu(self.fc1(x))
         x = self.fc4(x)
+        #x = F.linear(x, self.embedding.weight)
+        
+        
+        x = x - x*one_hot_gpu + 10000*one_hot_gpu
+        #Pdb().set_trace()
         return x
-              
+
+
+
+class G_Net_Tie(nn.Module):
+    def __init__(self, x_dim, class_dim, method):
+        super(G_Net_Tie, self).__init__()
+        self.x_dim = x_dim
+        self.class_dim = class_dim
+        #self.method = method
+        
+        self.fc1 = nn.Linear(self.x_dim + 96, 512)
+        self.fc2 = nn.Linear(512, 96)
+        #self.fc3 = nn.Linear(256, 128)
+        #self.fc4 = nn.Linear(128, self.class_dim)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.bn2 = nn.BatchNorm1d(96)
+        #self.bn3 = nn.BatchNorm1d(128)
+        self.embedding = torch.nn.Embedding(self.class_dim, 96)
+        #torch.nn.init.xavier_uniform(self.embedding.weight)
+        torch.nn.init.xavier_uniform(self.fc1.weight)
+        torch.nn.init.xavier_uniform(self.fc2.weight)
+        #torch.nn.init.xavier_uniform(self.fc3.weight)
+        #torch.nn.init.xavier_uniform(self.fc4.weight)
+        
     
+    def forward(self, inp, device):
+        #inp is a (batchsize x class_dim) x class_dim Vector
+        #Pdb().set_trace()
+        #one_hot_gpu = torch.zeros((inp[0].shape[0], self.class_dim))
+        #one_hot_gpu = one_hot_gpu.to(device)
+        #one_hot_gpu[torch.arange(inp[0].shape[0]), inp[1]] = 1
+        #print("tie") 
+        x = inp[0]
+        #y = inp[1].argmax(dim=1).long()
+        y = inp[1].long()
+        #y = one_hot_gpu
+        y = self.embedding(y)
+        x = torch.cat([x, y], dim=1)
+        x = F.elu(self.bn1(self.fc1(x)))
+        x = F.elu(self.bn2(self.fc2(x)))
+        #x = F.elu(self.bn3(self.fc3(x)))
+        #x = F.elu(self.fc1(x))
+        #x = self.fc4(x)
+        x = F.linear(x, self.embedding.weight)
+        
+        
+        #x = x - x*one_hot_gpu + 15*one_hot_gpu
+        return x
+
+
+class G_Net_XY_Annotate(nn.Module):
+    def __init__(self, x_dim, class_dim):
+        super(G_Net_XY_Annotate, self).__init__()
+        self.x_dim = x_dim
+        self.class_dim = class_dim
+        #self.method = method
+        
+        self.fc1 = nn.Linear(self.x_dim + 96, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, self.class_dim)
+        #self.fc4 = nn.Linear(128, self.class_dim)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.bn2 = nn.BatchNorm1d(256)
+        #self.bn3 = nn.BatchNorm1d(128)
+        self.embedding = torch.nn.Embedding(self.class_dim, 96)
+        #torch.nn.init.xavier_uniform(self.embedding.weight)
+        torch.nn.init.xavier_uniform(self.fc1.weight)
+        torch.nn.init.xavier_uniform(self.fc2.weight)
+        torch.nn.init.xavier_uniform(self.fc3.weight)
+        #torch.nn.init.xavier_uniform(self.fc4.weight)
+        
+    
+    def forward(self, inp, device):
+        #inp is a (batchsize x class_dim) x class_dim Vector
+        #Pdb().set_trace()
+        one_hot_gpu = torch.zeros((inp[0].shape[0], self.class_dim))
+        one_hot_gpu = one_hot_gpu.to(device)
+        one_hot_gpu[torch.arange(inp[0].shape[0]), inp[1]] = 1
+        
+        x = inp[0]
+        y = inp[1].long()
+        #y = inp[1].long()
+        #y = one_hot_gpu
+        y = self.embedding(y)
+        x = torch.cat([x, y], dim=1)
+        x = F.elu(self.bn1(self.fc1(x)))
+        x = F.elu(self.bn2(self.fc2(x)))
+        #x = F.elu(self.bn3(self.fc3(x)))
+        #x = F.elu(self.fc1(x))
+        x = self.fc3(x)
+        #x = F.linear(x, self.embedding.weight)
+        
+        
+        x = x - x*one_hot_gpu + 10000*one_hot_gpu
+        #Pdb().set_trace()
+        return x              
+"""   
 class G_Net_Tie(nn.Module):
     def __init__(self, x_dim, class_dim, method):
         super(G_Net_Tie, self).__init__()
@@ -227,7 +350,7 @@ class G_Net_Tie(nn.Module):
             
     def setWeights(self, M):
         self.fc1.weight.data = M
-    
+"""    
 class G_Net_Full(nn.Module):
     def __init__(self, x_dim, class_dim, method):
         super(G_Net_Full, self).__init__()
@@ -319,8 +442,32 @@ class G_Net_Hyperparameter(nn.Module):
     def setWeights(self, M):
         self.fc1.weight.data = M
     
+
+
+#INPUT x | ygold | yinput
+class LSTM(nn.Module):
+    def __init__(self, input_dim, output_dim, technique):
+        super().__init__()
+        self.input_dim = input_dim
+        self.class_dim = output_dim
+        self.hidden_layer_size = 100
+
+        self.lstm = nn.LSTM(input_dim+256, self.hidden_layer_size)
+
+        self.linear = nn.Linear(self.hidden_layer_size, output_dim+1)
+        self.embedding = torch.nn.Embedding(self.class_dim+4, 128)
+        
+    def forward(self, x, y, s):
+        y = self.embedding(y.argmax(dim=1).long())
+        s = self.embedding(s.argmax(dim=1).long())
+        input_seq = torch.cat([x,y,s],dim=1)
+        #Pdb().set_trace()
+        lstm_out, self.hidden_cell = self.lstm(input_seq.unsqueeze(dim=0), self.hidden_cell)
+        
+        predictions = self.linear(lstm_out.view(len(input_seq), -1))
+        return predictions
     
-    
+
     
     
     

@@ -111,6 +111,34 @@ def prepTrain(filename):
     #real_train_dataset = Dataset(data[0:9*tenth], target[0:9*tenth])
 
     #return train_dataset, test_dataset, real_train_dataset, data.shape[1], partials.shape[1]
+    
+def makeLSTM(filename, predicted, correct):
+    
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+        
+    new_partials = target.copy()
+    
+    #print(type(partials))
+    print(len(predicted))
+    print(len(partials))
+    for i in range(len(partials)):
+        for j in predicted[i]:
+            new_partials[i,j] = 1
+    print(filename)
+    print(partials.sum()/target.sum())
+    print(new_partials.sum()/target.sum())
+    print(np.multiply(new_partials,target).sum())
+    print(target.sum())
+    print("\n")    
+        
+    with open("datasets/"+filename+"_lstm.mat.pkl", "wb") as f:
+        pickle.dump(data, f)
+        pickle.dump(new_partials, f)
+        pickle.dump(target, f)
+    
 def remake(filename, newname):
     with open("datasets/"+filename+".mat.pkl", "rb") as f:
         data = pickle.load(f)
@@ -227,6 +255,29 @@ def loadTrain(filename, fold_no, k):
     
     #return train_data, test_data
     return train_dataset, real_train_dataset, val_dataset, real_val_dataset, test_dataset, real_test_dataset, data.shape[1], partials.shape[1]
+
+def loadTrainFull(filename):  
+    
+    with open(filename+".pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+    if(not('MNIST' in filename)):
+        data -= np.mean(data, axis=0)
+        data /= np.std(data, axis=0)
+    
+    train_data = data
+    train_target = target
+    train_partials = partials
+    
+    
+    train_dataset = Dataset(train_data, train_partials)
+    real_train_dataset = Dataset(train_data, train_target)
+    
+    #return train_data
+    return train_dataset, real_train_dataset, data.shape[1], partials.shape[1]
+
+
 
 def makeTransition(filename):
     """matrix = [[3,7,1,23,43,12,9,34,4,2],
@@ -365,7 +416,34 @@ def twoTransition(filename):
     transition = matrix
     with open("datasets/transition/"+"two_"+filename+".pkl", "wb") as f:
         pickle.dump(transition, f)
+ 
+def flipTransition(filename):
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+    labels = partials.shape[1]
+    coin = 0.03 if filename == "Soccer Player" else 0.17
+    matrix = np.zeros((labels, labels))
+    
+    for i in range(labels):
+        for j in range(labels):
+            if(i==j):
+                matrix[i][j] = 1
+            else:
+                
+                if(flip(coin)):
+                    matrix[i][j] = random.uniform(0.5, 0.8)
+                else:
+                    if(filename != "Soccer Player"):
+                        matrix[i][j] = random.uniform(0.08, 0.1)
+                    else:
+                        matrix[i][j] = random.uniform(0.001, 0.004)
         
+        
+    transition = matrix
+    with open("datasets/transition/"+"flip_"+filename+".pkl", "wb") as f:
+        pickle.dump(transition, f)
+       
 def remakeTransition(filename, method):
     with open("datasets/"+filename+".mat.pkl", "rb") as f:
         data = pickle.load(f)
@@ -388,6 +466,7 @@ def remakeTransition(filename, method):
             if(flip(prob)):
                 partials[i,j] = 1
     #print(partials.sum(axis=1).mean())
+    print(old_partials.sum()/target.sum())
     print(partials.sum()/target.sum())
     print(np.multiply(partials,target).sum())
     print(target.sum())
@@ -397,6 +476,32 @@ def remakeTransition(filename, method):
         pickle.dump(partials, f)
         pickle.dump(target, f)
 
+def remakeRandomGold(filename, method):
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+    #old_partials = partials.copy()
+    old_target = target.copy()
+    target = np.zeros_like(old_target)
+    
+    #partials = np.zeros_like(target)
+    labels = partials.shape[1]
+    choices = list(range(labels))
+    for i in range(target.shape[0]):
+        j = random.choice(choices)     
+        target[i,j] = 1
+    
+    #print(partials.sum()/target.sum())
+    #print(np.multiply(partials,target).sum())
+    print(target.sum())
+    print(target.shape[0])
+    print("\n")
+    
+    with open("datasets/"+filename+"_randomGold"+method+".mat.pkl", "wb") as f:
+        pickle.dump(data, f)
+        pickle.dump(partials, f)
+        pickle.dump(target, f)
 
 #for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
 #    makeTransition(i)
@@ -405,16 +510,57 @@ def remakeTransition(filename, method):
 #makeTransition()      
 #print(Y_train_one)
 
+def makeMix(filename, prob):
+    
+        
+    with open("datasets/"+filename+".mat.pkl", "rb") as f:
+        data = pickle.load(f)
+        partials = pickle.load(f)
+        target = pickle.load(f)
+        
+    new_data  = data.copy()
+    new_partials = np.zeros_like(partials)
+    new_target = target.copy()
+    count=0
+    for i in range(target.shape[0]):
+        if(flip(prob)):
+            count+=1
+            new_partials[i] = target[i]
+        else:
+            new_partials[i] = partials[i]
+    print(float(count)/target.shape[0])
+    #with open("datasets/transition/"+method+"_"+filename+".pkl", "rb") as f:
+    #    transition = pickle.load(f)
+    
+    #(partials.sum()/target.sum())
+    #print(partials.sum()/target.sum())
+    print(np.multiply(new_partials,new_target).sum())
+    print(target.sum())
+    print("\n")
+    
+    with open("datasets/"+filename+"_mix_"+str(prob)+".mat.pkl", "wb") as f:
+        pickle.dump(new_data, f)
+        pickle.dump(new_partials, f)
+        pickle.dump(new_target, f)
+
 
 #def MNIST():
     
 
 def main():
-    for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
-        oneTransition(i)
-        twoTransition(i)
-        remakeTransition(i, "one")
-        remakeTransition(i, "two")
+    print("HELLO")
+    #for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
+    #    remakeRandomGold(i,"_2")
+    #    remakeRandomGold(i,"_1")
+    #for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
+    #    for j in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1]:
+    #        makeMix(i, j)
+    #for i in ['lost','MSRCv2','BirdSong','Soccer Player']:
+    #    for j in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1]:
+    #        makeMix(i+"_noisy_annotator", j)
+    #    twoTransition(i)
+        #remakeTransition(i, "flip")
+    #    remakeTransition(i, "two")
 #    MNIST()
     #for i in [4]:
     #    remakeCC("lost", i)
