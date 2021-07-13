@@ -42,6 +42,8 @@ parser.add_argument('--optimizer', type=str, help="Optimizer: default Adam")
 parser.add_argument('--batch_size', type=int, help="batch_size", default = 64)
 parser.add_argument('--dataset_folder', type=str, help="dataset_folder")
 
+parser.add_argument('--lr', type=float, help="learning rate", default = 0.1)
+parser.add_argument('--weight_decay', type=float, help="weight decay", default = 0.00001)
 parser.add_argument('--val_metric',default ='acc',type=str, help="validation accuracy metric: loss or accuracy")
 
 
@@ -614,6 +616,7 @@ def main():
     loss_techniques = ["fully_supervised", "cc_loss", "min_loss", "naive_loss", "iexplr_loss", 'regularized_cc_loss','cour_loss', 'svm_loss']
     
     if((argument.optimizer is None) or (argument.optimizer == "Adam")):
+        wd = argument.weight_decay
         optimizer = lambda x: torch.optim.Adam(x,weight_decay = 0.000001)
         #optimizer = torch.optim.Adam
     elif(argument.optimizer == 'SGD'):
