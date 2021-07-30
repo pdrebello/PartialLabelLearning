@@ -47,6 +47,7 @@ Two folders:
 PRETRAINING:
 
 For RL: Ensure you have run techinque = "cc_loss"
+
 For Generative Modeeling: Ensure you have technique = cc_loss_<optimizer>_<lr>_<weight_decay>
 
 -----
@@ -76,4 +77,4 @@ python train.py   --technique weighted_loss_y_Adam_0.01_1e-06 --datasets "BirdSo
 -----
 ANALYSIS
 
-notebooks/Analyis.ipynb will read log files
+notebooks/Analysis.ipynb will read log files
