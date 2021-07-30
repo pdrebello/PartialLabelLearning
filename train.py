@@ -615,6 +615,7 @@ def save_checkpoint(epoch, val_acc, p_net, p_optimizer, s_net, s_optimizer, file
 
 def getPretrainPEpochs(thr, logfile):
     thr = float(thr)/100.0
+    print(logfile)
     dat = pd.read_json(logfile,orient = 'records',lines=True)
     best_val = dat['surrogate_val_acc'].iloc[-1]
     best_val
@@ -1109,7 +1110,7 @@ def main():
             pretrain_p_perc = argument.pretrain_p_perc
             print(pretrain_p_perc)
             print(type(pretrain_p_perc))
-            if((argument.pretrain == 1) and (pretrain_p_perc > 0)):
+            if((argument.pretrain_p == 1) and (pretrain_p_perc > 0)):
                 print("ENTERED")
                 if('fully_supervised' in technique):
                     dataset_pretrain_technique_path = os.path.join(filename, model, "fully_supervised_{}_{}_{}".format(argument.optimizer,argument.lr,argument.weight_decay), str(fold_no))
@@ -1300,7 +1301,7 @@ def main():
                     json.dump(log, file)
                     file.write("\n")
 
-        elif((technique == "linear_rl") or (technique == "exponential_rl")):    
+        elif(("linear_rl" in technique) or ("exponential_rl"in technique)):    
             loss_function = cc_loss
             
             if(model == "1layer"):
@@ -1316,7 +1317,7 @@ def main():
             if(pretrain_p):
                 overall_strategy += "_P"
                 if(pretrain_p_perc is not None):
-                    overall_strategy += pretrain_p_perc
+                    overall_strategy += str(pretrain_p_perc)
             if(pretrain_q):
                 overall_strategy += "_Q"
             print(overall_strategy)
