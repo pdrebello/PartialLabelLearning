@@ -38,8 +38,10 @@ All models and networks are in: networks.py
 OUTPUT STRUCTURE:
 
 You have given the following as arguments: dump_dir, dataset, model, technique, fold_no
+
 The output for this run will be written to: dump_dir/dataset/model/technique/fold_no
-Two folders:
+
+Inside this, you will find two folders:
 1. models: This will contain train_<epoch>.pth files, along with train_best.pth file. Check "save_checkpoint" function in train.py to see what is stored.
 2. logs: This will contain log.json
     log.json will have a list of dictionaries, one for each epoch, with stats. Test epoch has epoch = -1
@@ -48,7 +50,7 @@ PRETRAINING:
 
 For RL: Ensure you have run techinque = "cc_loss"
 
-For Generative Modeeling: Ensure you have technique = cc_loss_<optimizer>_<lr>_<weight_decay>
+For Generative Modeeling: Ensure you have run technique = cc_loss_<optimizer>_<lr>_<weight_decay>
 
 -----
 EXAMPLE RUNS:
@@ -73,6 +75,13 @@ python train.py   --technique weighted_loss_xy_lstm_iexplr_Adam_0.01_1e-06 --dat
 
 Y DEPENDENCE (MATRIX MODEL):
 python train.py   --technique weighted_loss_y_Adam_0.01_1e-06 --datasets "BirdSong,Soccer Player" --fold_no 0 --dump_dir results/test --model 3layer --pretrain_p 1  --pretrain_p_perc 100 --optimizer Adam --lr 0.01 --weight_decay 1e-06 --batch_size 64 --dataset_folder datasets
+
+-----
+JOBS
+
+Modify create.py to include jobs required.
+
+python create.py  -num_task_per_process 3 -num_process_per_job 6 -task_script <train_script> -global_time 2 -dump_dir <dump_dir> -jobs_dir <jobs_dir>  -multi_header multinode_header.sh
 
 -----
 ANALYSIS
