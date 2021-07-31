@@ -109,4 +109,31 @@ ANALYSIS
 
 Inside "notebooks" folder:
     
-Analysis.ipynb will read log files, extract the test epoch and put into a pandas dataframe. Further manipulation can be done in notebook.
+**Analysis.ipynb**
+  
+will read log files, extract the test epoch and put into a pandas dataframe. 
+
+**Input:** <dump_dir>
+`log.json` should be present at the appropriate location, i.e. `<dump_dir>/<dataset>/<model>/<technique>/<fold_no>/logs/`
+It reads the meta info from the path name, i.e. dataset name, model,  technique, and the fold number.
+
+
+**Output:** 
+The script computes various statistics of the following variables:
+ -  'real_test_acc',
+ - 'train_IOU',
+ - 'train_IOU_neg',
+- 'val_IOU',
+- 'val_IOU_neg',
+- 'test_IOU',
+- 'test_IOU_neg',
+- 'surrogate_test_acc', 
+- 'surrogate_train_acc', 
+- 'real_train_acc', 
+- 'surrogate_val_acc', 
+- 'real_val_acc', 
+- 'train_confidence', 
+- 'val_confidence', 
+- 'test_confidence'
+
+Further manipulation can be done in notebook.
