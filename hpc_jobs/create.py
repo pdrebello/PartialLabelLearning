@@ -62,9 +62,9 @@ args = parser.parse_args(sys.argv[1:])
 
 #module_load_str = 'module load apps/pythonpackages/3.6.0/pytorch/0.4.1/gpu'
 #module_load_str = 'module load apps/anaconda3/4.6.9'
-module_load_str = 'module load apps/anaconda/3'
-module_load_str += "\n"
-module_load_str += "module load apps/pytorch/1.5.0/gpu/anaconda3"
+#module_load_str = 'module load apps/anaconda/3'
+#module_load_str += "\n"
+module_load_str = "module load apps/pytorch/1.5.0/gpu/anaconda3"
 
 working_dir = '/home/cse/phd/csz178057/pratheek/PartialLabelLearning'
 
