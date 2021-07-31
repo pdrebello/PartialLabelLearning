@@ -105,7 +105,9 @@ Then run:
 ```python create.py  -num_task_per_process <num_processes> -num_process_per_job <num_per_jobs> -task_script <train_script> -global_time <global_time> -dump_dir <dump_dir> -jobs_dir <jobs_dir>  -multi_header <multinode_header>```
 
 Example Run:
-```python create.py  -num_task_per_process 3 -num_process_per_job 6 -task_script /home/cse/phd/csz178057/pratheek/PartialLabelLearning/train.py -global_time 2 -dump_dir /home/cse/phd/csz178057/hpcscratch/unification/pll/results/test -jobs_dir test  -multi_header multinode_header.sh
+    
+```
+python create.py  -num_task_per_process 3 -num_process_per_job 6 -task_script /home/cse/phd/csz178057/pratheek/PartialLabelLearning/train.py -global_time 2 -dump_dir /home/cse/phd/csz178057/hpcscratch/unification/pll/results/test -jobs_dir test  -multi_header multinode_header.sh
 ```
     
 -----
