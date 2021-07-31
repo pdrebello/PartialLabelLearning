@@ -97,11 +97,16 @@ python train.py   --technique weighted_loss_y_Adam_0.01_1e-06 --datasets "BirdSo
 -----
 JOBS
 
+Inside "hpc_run" folder:
+
 Modify create.py to include jobs required.
 
-python create.py  -num_task_per_process 3 -num_process_per_job 6 -task_script <train_script> -global_time 2 -dump_dir <dump_dir> -jobs_dir <jobs_dir>  -multi_header multinode_header.sh
+Then run:
+```python create.py  -num_task_per_process <num_processes> -num_process_per_job 6 -task_script <train_script> -global_time <global_time> -dump_dir <dump_dir> -jobs_dir <jobs_dir>  -multi_header multinode_header.sh```
 
 -----
 ANALYSIS
 
-notebooks/Analysis.ipynb will read log files
+Inside "notebooks" folder:
+    
+Analysis.ipynb will read log files, extract the test epoch and put into a pandas dataframe. Further manipulation can be done in notebook.
